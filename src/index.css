@@ -50,14 +50,20 @@
     border: 1px solid #e9d3a8;
   }
 
-  /* Smooth theme transitions */
+  /* Smooth theme transitions scoped to structural surfaces & controls (avoids global div/span overhead) */
   body,
+  .app-shell,
   header,
   footer,
   aside,
   article,
-  div,
-  span,
+  .beige-panel,
+  .beige-sidebar,
+  .beige-sand,
+  .beige-inset,
+  .beige-sage,
+  .beige-terracotta,
+  .beige-amber,
   button,
   input,
   select {
@@ -314,6 +320,7 @@ body.dark-theme :focus-visible {
     transform: translateY(18px) scale(0.988);
     filter: blur(2px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -326,6 +333,7 @@ body.dark-theme :focus-visible {
     opacity: 0;
     transform: translateY(14px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -338,6 +346,7 @@ body.dark-theme :focus-visible {
     transform: translateX(38px) scale(0.99);
     filter: blur(1.5px);
   }
+
   100% {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -351,6 +360,7 @@ body.dark-theme :focus-visible {
     transform: translateX(-38px) scale(0.99);
     filter: blur(1.5px);
   }
+
   100% {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -363,6 +373,7 @@ body.dark-theme :focus-visible {
     opacity: 0;
     transform: translateY(-10px) scale(0.992);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -374,6 +385,7 @@ body.dark-theme :focus-visible {
     opacity: 0;
     transform: scaleY(0.08);
   }
+
   100% {
     opacity: 1;
     transform: scaleY(1);
@@ -385,6 +397,7 @@ body.dark-theme :focus-visible {
     opacity: 0;
     transform: translateY(12px) scale(0.975);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -421,40 +434,93 @@ body.dark-theme :focus-visible {
 }
 
 /* Automatic Line-by-Line Staggered Container Reveals */
-.stagger-children > * {
+.stagger-children>* {
   animation: revealUp 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 75ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 150ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 225ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 300ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 375ms; }
-.stagger-children > *:nth-child(7) { animation-delay: 450ms; }
-.stagger-children > *:nth-child(8) { animation-delay: 525ms; }
+
+.stagger-children>*:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.stagger-children>*:nth-child(2) {
+  animation-delay: 75ms;
+}
+
+.stagger-children>*:nth-child(3) {
+  animation-delay: 150ms;
+}
+
+.stagger-children>*:nth-child(4) {
+  animation-delay: 225ms;
+}
+
+.stagger-children>*:nth-child(5) {
+  animation-delay: 300ms;
+}
+
+.stagger-children>*:nth-child(6) {
+  animation-delay: 375ms;
+}
+
+.stagger-children>*:nth-child(7) {
+  animation-delay: 450ms;
+}
+
+.stagger-children>*:nth-child(8) {
+  animation-delay: 525ms;
+}
 
 /* Tighter Line-by-Line Cascade Inside Slides & Checklists */
-.stagger-lines > * {
+.stagger-lines>* {
   animation: revealUp 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.stagger-lines > *:nth-child(1) { animation-delay: 40ms; }
-.stagger-lines > *:nth-child(2) { animation-delay: 105ms; }
-.stagger-lines > *:nth-child(3) { animation-delay: 170ms; }
-.stagger-lines > *:nth-child(4) { animation-delay: 235ms; }
-.stagger-lines > *:nth-child(5) { animation-delay: 300ms; }
-.stagger-lines > *:nth-child(6) { animation-delay: 365ms; }
+
+.stagger-lines>*:nth-child(1) {
+  animation-delay: 40ms;
+}
+
+.stagger-lines>*:nth-child(2) {
+  animation-delay: 105ms;
+}
+
+.stagger-lines>*:nth-child(3) {
+  animation-delay: 170ms;
+}
+
+.stagger-lines>*:nth-child(4) {
+  animation-delay: 235ms;
+}
+
+.stagger-lines>*:nth-child(5) {
+  animation-delay: 300ms;
+}
+
+.stagger-lines>*:nth-child(6) {
+  animation-delay: 365ms;
+}
 
 /* Explicit Stagger Delay Helpers */
-.reveal-delay-1 { animation-delay: 60ms; }
-.reveal-delay-2 { animation-delay: 130ms; }
-.reveal-delay-3 { animation-delay: 200ms; }
-.reveal-delay-4 { animation-delay: 270ms; }
+.reveal-delay-1 {
+  animation-delay: 60ms;
+}
+
+.reveal-delay-2 {
+  animation-delay: 130ms;
+}
+
+.reveal-delay-3 {
+  animation-delay: 200ms;
+}
+
+.reveal-delay-4 {
+  animation-delay: 270ms;
+}
 
 /* Subtle Tactile Hover Elevation for Warm Cards */
 .hover-lift {
   transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 200ms ease;
+    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 200ms ease;
 }
 
 .hover-lift:hover {
@@ -468,6 +534,7 @@ body.dark-theme .hover-lift:hover {
 
 /* Respect WCAG Reduced Motion Preferences */
 @media (prefers-reduced-motion: reduce) {
+
   .animate-reveal-up,
   .animate-page-enter,
   .animate-slide-next,
@@ -475,12 +542,13 @@ body.dark-theme .hover-lift:hover {
   .animate-drawer-enter,
   .animate-chat-enter,
   .animate-bar-rise,
-  .stagger-children > *,
-  .stagger-lines > * {
+  .stagger-children>*,
+  .stagger-lines>* {
     animation: none !important;
     transition: none !important;
     filter: none !important;
   }
+
   .hover-lift:hover {
     transform: none !important;
   }

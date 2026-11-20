@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Clock,
   CheckCircle2,
@@ -26,29 +26,29 @@ interface RoutinePlannerProps {
   onAdoptAllRoutines: () => void;
 }
 
-export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({
+export const RoutinePlanner: React.FC<RoutinePlannerProps> = React.memo(({
   location,
   routines,
   onToggleRoutine,
   onAdoptAllRoutines,
 }) => {
-  const ventAnalysis = findOptimalVentilationWindows(location.hourlyForecast);
-  const maxHourlyPm25 = Math.max(
-    100,
-    ...location.hourlyForecast.map((h) => h.pm25)
+  const ventAnalysis = useMemo(
+    () => findOptimalVentilationWindows(location.hourlyForecast),
+    [location.hourlyForecast]
+  );
+  const maxHourlyPm25 = useMemo(
+    () => Math.max(100, ...location.hourlyForecast.map((h) => h.pm25)),
+    [location.hourlyForecast]
   );
 
-  const totalDoseSavedUg = routines
-    .filter((r) => r.isAdopted)
-    .reduce((acc, r) => acc + r.personalPm25DoseSavedUg, 0);
-  const totalCo2SavedKg = routines
-    .filter((r) => r.isAdopted)
-    .reduce((acc, r) => acc + r.co2eSavedKg, 0)
-    .toFixed(2);
-  const totalPmNoxSavedG = routines
-    .filter((r) => r.isAdopted)
-    .reduce((acc, r) => acc + r.localPollutantsSavedGrams, 0)
-    .toFixed(1);
+  const { totalDoseSavedUg, totalCo2SavedKg, totalPmNoxSavedG } = useMemo(() => {
+    const adopted = routines.filter((r) => r.isAdopted);
+    return {
+      totalDoseSavedUg: adopted.reduce((acc, r) => acc + r.personalPm25DoseSavedUg, 0),
+      totalCo2SavedKg: adopted.reduce((acc, r) => acc + r.co2eSavedKg, 0).toFixed(2),
+      totalPmNoxSavedG: adopted.reduce((acc, r) => acc + r.localPollutantsSavedGrams, 0).toFixed(1),
+    };
+  }, [routines]);
 
   return (
     <div className="space-y-6">
@@ -101,10 +101,12 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({
               return (
                 <div
                   key={`${location.id}-${point.hourIndex}`}
-                  className="group relative flex flex-col items-center justify-end h-full"
+                  tabIndex={0}
+                  aria-label={`${point.hourLabel}: PM2.5 ${point.pm25} micrograms per cubic meter, wind ${point.windSpeedKmh} kilometers per hour${isSafe ? ', best ventilation window' : isTrap ? ', smog peak' : ''}`}
+                  className="group relative flex flex-col items-center justify-end h-full rounded-sm focus-visible:outline-2 focus-visible:outline-[#2D6A4F]"
                 >
-                  {/* Tooltip on Hover */}
-                  <div className="pointer-events-none absolute -top-9 z-20 hidden rounded-lg bg-[#231D17] px-2.5 py-1 text-[10px] font-semibold text-[#FFFDF8] shadow-md group-hover:block whitespace-nowrap">
+                  {/* Tooltip on Hover & Keyboard Focus */}
+                  <div className="pointer-events-none absolute -top-9 z-20 hidden rounded-lg bg-[#231D17] px-2.5 py-1 text-[10px] font-semibold text-[#FFFDF8] shadow-md group-hover:block group-focus:block whitespace-nowrap">
                     {point.hourLabel}: {point.pm25} µg/m³ | Wind {point.windSpeedKmh} km/h
                   </div>
 
@@ -317,4 +319,5 @@ export const RoutinePlanner: React.FC<RoutinePlannerProps> = ({
       </RevealOnScroll>
     </div>
   );
-};
+});
+RoutinePlanner.displayName = 'RoutinePlanner';

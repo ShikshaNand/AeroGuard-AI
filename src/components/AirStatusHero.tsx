@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Clock,
   ShieldCheck,
@@ -24,7 +24,7 @@ interface AirStatusHeroProps {
   iaqSim: IndoorAirSimulationResult;
 }
 
-export const AirStatusHero: React.FC<AirStatusHeroProps> = ({
+export const AirStatusHero: React.FC<AirStatusHeroProps> = React.memo(({
   location,
   iaqSim,
 }) => {
@@ -38,7 +38,10 @@ export const AirStatusHero: React.FC<AirStatusHeroProps> = ({
     location.windSpeedKmh,
     location.pm25
   );
-  const ventWindow = findOptimalVentilationWindows(location.hourlyForecast);
+  const ventWindow = useMemo(
+    () => findOptimalVentilationWindows(location.hourlyForecast),
+    [location.hourlyForecast]
+  );
 
   return (
     <section
@@ -183,4 +186,5 @@ export const AirStatusHero: React.FC<AirStatusHeroProps> = ({
       )}
     </section>
   );
-};
+});
+AirStatusHero.displayName = 'AirStatusHero';

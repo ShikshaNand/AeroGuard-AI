@@ -66,9 +66,21 @@ export function SlideDeckContainer<T>({
     setActiveIndex(idx);
   };
 
+  const handleDeckKeyDown = (e: React.KeyboardEvent) => {
+    if (viewMode !== 'slides') return;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handleNext();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handlePrev();
+    }
+  };
+
   return (
     <section
       aria-label={title}
+      onKeyDown={handleDeckKeyDown}
       className="beige-panel hc-card rounded-3xl p-5 sm:p-6 space-y-5 overflow-hidden"
     >
       {/* Clean Header Row */}
@@ -126,7 +138,14 @@ export function SlideDeckContainer<T>({
               <span className="rounded-full bg-[#F1EADC] border border-[#E1D5C1] px-3 py-1 text-xs font-extrabold text-[#231D17]">
                 Slide {safeIndex + 1} of {items.length}
               </span>
-              <div className="hidden sm:block w-36 h-2 rounded-full bg-[#EBE2D3] overflow-hidden">
+              <div
+                role="progressbar"
+                aria-label={`${title} progress`}
+                aria-valuenow={safeIndex + 1}
+                aria-valuemin={1}
+                aria-valuemax={items.length}
+                className="hidden sm:block w-36 h-2 rounded-full bg-[#EBE2D3] overflow-hidden"
+              >
                 <div
                   style={{ width: `${progressPct}%` }}
                   className="h-full rounded-full bg-[#2D6A4F] transition-all duration-300 ease-out"
@@ -172,6 +191,7 @@ export function SlideDeckContainer<T>({
                 key={`dot-${getKey(item)}`}
                 type="button"
                 aria-label={`Go to slide ${idx + 1}: ${getLabel(item, idx)}`}
+                aria-current={idx === safeIndex ? 'step' : undefined}
                 onClick={() => handleJumpTo(idx)}
                 className={`h-2.5 rounded-full transition-all duration-300 ${
                   idx === safeIndex

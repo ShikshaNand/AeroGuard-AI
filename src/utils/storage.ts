@@ -7,9 +7,9 @@
  * SECURITY NOTE: API keys are intentionally NEVER persisted here.
  */
 
-import type { FamilyProfile, LocationAirQuality } from '../types';
+import type { FamilyProfile, HourlyPollutantPoint, LocationAirQuality } from '../types';
 import { DEFAULT_FAMILY_PROFILE, WINTER_SMOG_CITY_PRESETS } from '../data/smogPresets';
-import { sanitizeTextInput } from './security';
+import { sanitizeTextInput, validateCoordinates } from './security';
 
 export const STORAGE_KEY = 'aeroguard_user_state_v1';
 
@@ -140,26 +140,92 @@ function validateProfile(raw: unknown): FamilyProfile {
   };
 }
 
-function validateLocation(raw: unknown): LocationAirQuality {
+function clampFloat(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Number(value.toFixed(1))));
+}
+
+function validateHourlyPoint(raw: unknown, idx: number): HourlyPollutantPoint | null {
   if (!raw || typeof raw !== 'object') {
-    return WINTER_SMOG_CITY_PRESETS[0];
+    return null;
+  }
+  const p = raw as Record<string, unknown>;
+  const hourIndex = clampInt(p.hourIndex, 0, 23, idx % 24);
+  const pm25 = clampInt(p.pm25, 0, 1500, 50);
+  const pm10 = clampInt(p.pm10, pm25, 2500, Math.round(pm25 * 1.4));
+  return {
+    hourLabel: `${String(hourIndex).padStart(2, '0')}:00`,
+    hourIndex,
+    pm25,
+    pm10,
+    no2: clampInt(p.no2, 0, 1000, 35),
+    windSpeedKmh: clampFloat(p.windSpeedKmh, 0, 150, 5),
+    tempC: clampFloat(p.tempC, -50, 60, 10),
+    usAqi: clampInt(p.usAqi, 0, 500, 120),
+    isSafeVentilationWindow: Boolean(p.isSafeVentilationWindow),
+    isInversionTrap: Boolean(p.isInversionTrap),
+  };
+}
+
+function validateLocation(raw: unknown): LocationAirQuality {
+  const fallback = WINTER_SMOG_CITY_PRESETS[0];
+  if (!raw || typeof raw !== 'object') {
+    return fallback;
   }
   const obj = raw as Record<string, unknown>;
-  if (
-    typeof obj.city === 'string' &&
-    typeof obj.country === 'string' &&
-    typeof obj.pm25 === 'number' &&
-    typeof obj.usAqi === 'number' &&
-    Array.isArray(obj.hourlyForecast) &&
-    obj.hourlyForecast.length > 0
-  ) {
-    return {
-      ...(obj as unknown as LocationAirQuality),
-      city: sanitizeTextInput(obj.city, 60),
-      country: sanitizeTextInput(obj.country, 60),
-    };
+  const city = typeof obj.city === 'string' ? sanitizeTextInput(obj.city, 60) : '';
+  const country = typeof obj.country === 'string' ? sanitizeTextInput(obj.country, 60) : '';
+  if (!city || !country || !Array.isArray(obj.hourlyForecast) || obj.hourlyForecast.length === 0) {
+    return fallback;
   }
-  return WINTER_SMOG_CITY_PRESETS[0];
+
+  const hourlyForecast = obj.hourlyForecast
+    .slice(0, 24)
+    .map((item, idx) => validateHourlyPoint(item, idx))
+    .filter((item): item is HourlyPollutantPoint => item !== null);
+
+  if (hourlyForecast.length === 0) {
+    return fallback;
+  }
+
+  const coords = validateCoordinates(
+    typeof obj.latitude === 'number' ? obj.latitude : fallback.latitude,
+    typeof obj.longitude === 'number' ? obj.longitude : fallback.longitude
+  );
+  const pm25 = clampInt(obj.pm25, 0, 1500, fallback.pm25);
+
+  return {
+    id:
+      typeof obj.id === 'string' && obj.id.length <= 64
+        ? sanitizeTextInput(obj.id, 64) || fallback.id
+        : fallback.id,
+    city,
+    country,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    isLiveApi: Boolean(obj.isLiveApi),
+    updatedAt:
+      typeof obj.updatedAt === 'string'
+        ? sanitizeTextInput(obj.updatedAt, 60) || fallback.updatedAt
+        : fallback.updatedAt,
+    pm25,
+    pm10: clampInt(obj.pm10, pm25, 2500, Math.round(pm25 * 1.4)),
+    no2: clampInt(obj.no2, 0, 1000, fallback.no2),
+    o3: clampInt(obj.o3, 0, 1000, fallback.o3),
+    so2: clampInt(obj.so2, 0, 1000, fallback.so2),
+    co: clampInt(obj.co, 0, 50000, fallback.co),
+    usAqi: clampInt(obj.usAqi, 0, 500, fallback.usAqi),
+    temperatureC: clampFloat(obj.temperatureC, -50, 60, fallback.temperatureC),
+    humidityPct: clampInt(obj.humidityPct, 0, 100, fallback.humidityPct),
+    windSpeedKmh: clampFloat(obj.windSpeedKmh, 0, 150, fallback.windSpeedKmh),
+    dominantSmogSource:
+      typeof obj.dominantSmogSource === 'string'
+        ? sanitizeTextInput(obj.dominantSmogSource, 220) || fallback.dominantSmogSource
+        : fallback.dominantSmogSource,
+    hourlyForecast,
+  };
 }
 
 export function getDefaultPersistedState(): PersistedAppState {

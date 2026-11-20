@@ -13,28 +13,34 @@ const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 const PROMPT_INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?(previous|prior|system)\s+instructions/i,
   /disregard\s+(all\s+)?(previous|system)\s+prompt/i,
+  /reveal\s+(your\s+|the\s+)?system\s+prompt/i,
   /you\s+are\s+now\s+in\s+developer\s+mode/i,
+  /\bact\s+as\s+(a\s+)?dan\b/i,
   /<script[\s>]/i,
   /onerror\s*=/i,
 ];
 
 /**
- * Sanitizes free-form user text by stripping HTML tags, dangerous URI schemes,
- * inline event handlers, and non-printable control characters, and truncating to a safe maximum length.
+ * Sanitizes free-form user text by stripping HTML tags (iteratively to prevent nested bypasses),
+ * dangerous URI schemes, inline event handlers, and non-printable control characters,
+ * and truncating to a safe maximum length.
  */
 export function sanitizeTextInput(input: string, maxLength = 500): string {
   if (typeof input !== 'string') {
     return '';
   }
 
-  const cleaned = input
-    .replace(CONTROL_CHARS_REGEX, '')
-    .replace(HTML_TAG_REGEX, '')
-    .replace(DANGEROUS_SCHEME_REGEX, '')
-    .replace(EVENT_HANDLER_REGEX, '')
-    .trim();
+  let cleaned = input.replace(CONTROL_CHARS_REGEX, '');
+  let prev = '';
+  while (cleaned !== prev) {
+    prev = cleaned;
+    cleaned = cleaned
+      .replace(HTML_TAG_REGEX, '')
+      .replace(DANGEROUS_SCHEME_REGEX, '')
+      .replace(EVENT_HANDLER_REGEX, '');
+  }
 
-  return cleaned.slice(0, Math.max(1, maxLength));
+  return cleaned.trim().slice(0, Math.max(1, maxLength));
 }
 
 /**
@@ -108,6 +114,37 @@ export function maskApiKey(rawKey: string): string {
     return '••••••••';
   }
   return `${trimmed.slice(0, 3)}••••••••••••${trimmed.slice(-4)}`;
+}
+
+/**
+ * Validates that a user-supplied Gemini API key looks structurally plausible
+ * (no whitespace, safe ASCII token characters, reasonable length) without
+ * rejecting future Google key prefixes.
+ */
+export function validateGeminiApiKeyFormat(rawKey: string): {
+  isValid: boolean;
+  reason?: string;
+} {
+  const trimmed = rawKey.trim();
+  if (!trimmed) {
+    return { isValid: true };
+  }
+  if (/\s/.test(trimmed)) {
+    return { isValid: false, reason: 'API keys cannot contain spaces.' };
+  }
+  if (trimmed.length < 16 || trimmed.length > 128) {
+    return {
+      isValid: false,
+      reason: 'API key length looks invalid (expected 16–128 characters).',
+    };
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+    return {
+      isValid: false,
+      reason: 'API key contains unsupported characters.',
+    };
+  }
+  return { isValid: true };
 }
 
 /**

@@ -22,6 +22,7 @@ import type {
   HomeSealingLevel,
 } from '../types';
 import { sanitizeTextInput } from '../utils/security';
+import { applyMemberCounts, type MemberCountField } from '../domain/familyMembers';
 
 interface FamilyProfileBarProps {
   profile: FamilyProfile;
@@ -115,34 +116,9 @@ export const FamilyProfileBar: React.FC<FamilyProfileBarProps> = ({
   onClose,
 }) => {
   const updateMemberCounts = (
-    patch: Partial<
-      Pick<
-        FamilyProfile,
-        'adultsCount' | 'childrenCount' | 'seniorsCount' | 'respiratoryCareCount' | 'petsCount'
-      >
-    >
+    patch: Partial<Pick<FamilyProfile, MemberCountField>>
   ) => {
-    const adultsCount = patch.adultsCount ?? profile.adultsCount;
-    const childrenCount = patch.childrenCount ?? profile.childrenCount;
-    const seniorsCount = patch.seniorsCount ?? profile.seniorsCount;
-    const respiratoryCareCount = patch.respiratoryCareCount ?? profile.respiratoryCareCount;
-    const petsCount = patch.petsCount ?? profile.petsCount;
-
-    const totalPeople = Math.max(1, adultsCount + childrenCount + seniorsCount);
-
-    onUpdateProfile({
-      ...profile,
-      adultsCount,
-      childrenCount,
-      seniorsCount,
-      respiratoryCareCount,
-      petsCount,
-      householdSize: totalPeople,
-      hasInfantsOrChildren: childrenCount > 0,
-      hasElderlyMembers: seniorsCount > 0,
-      hasAsthmaOrRespiratory: respiratoryCareCount > 0,
-      hasPets: petsCount > 0,
-    });
+    onUpdateProfile(applyMemberCounts(profile, patch));
   };
 
   return (

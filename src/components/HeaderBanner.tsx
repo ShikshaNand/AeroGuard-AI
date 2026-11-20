@@ -20,7 +20,7 @@ import {
   searchCities,
   type GeocodingResult,
 } from '../services/openMeteoService';
-import { maskApiKey, sanitizeTextInput } from '../utils/security';
+import { maskApiKey, sanitizeTextInput, validateGeminiApiKeyFormat } from '../utils/security';
 
 interface HeaderBannerProps {
   location: LocationAirQuality;
@@ -52,9 +52,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   const [isLoadingCity, setIsLoadingCity] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyInputDraft, setKeyInputDraft] = useState('');
+  const [keyError, setKeyError] = useState<string | null>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
+  const cityTriggerRef = useRef<HTMLButtonElement>(null);
+  const keyTriggerRef = useRef<HTMLButtonElement>(null);
 
-  // Close city dropdown when clicking outside
+  // Close city dropdown on outside click and close overlays on Escape key with focus restoration
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -64,9 +67,26 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         setCityMenuOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (cityMenuOpen) {
+          setCityMenuOpen(false);
+          cityTriggerRef.current?.focus();
+        }
+        if (showKeyModal) {
+          setShowKeyModal(false);
+          setKeyError(null);
+          keyTriggerRef.current?.focus();
+        }
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [cityMenuOpen, showKeyModal]);
 
   // Debounced geocoding city search
   useEffect(() => {
@@ -114,9 +134,16 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
 
   const handleSaveKey = (e: React.FormEvent) => {
     e.preventDefault();
+    const check = validateGeminiApiKeyFormat(keyInputDraft);
+    if (!check.isValid) {
+      setKeyError(check.reason ?? 'Invalid API key format.');
+      return;
+    }
+    setKeyError(null);
     onSaveSessionApiKey(keyInputDraft.trim());
     setKeyInputDraft('');
     setShowKeyModal(false);
+    keyTriggerRef.current?.focus();
   };
 
   return (
@@ -152,6 +179,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           {/* Center: Clean City Switcher Dropdown (Live Search + Popular Cities) */}
           <div ref={cityDropdownRef} className="relative flex-1 max-w-sm">
             <button
+              ref={cityTriggerRef}
               type="button"
               onClick={() => setCityMenuOpen((prev) => !prev)}
               aria-expanded={cityMenuOpen}
@@ -293,8 +321,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             </button>
 
             <button
+              ref={keyTriggerRef}
               type="button"
-              onClick={() => setShowKeyModal((prev) => !prev)}
+              onClick={() => {
+                setShowKeyModal((prev) => !prev);
+                setKeyError(null);
+              }}
               aria-expanded={showKeyModal}
               aria-label="Configure optional Gemini API key"
               title="Optional: Connect your own Gemini API key"
@@ -327,6 +359,11 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 {sessionApiKey && (
                   <p className="text-[#1B4D35] font-semibold">
                     Active session key: <code>{maskApiKey(sessionApiKey)}</code>
+                  </p>
+                )}
+                {keyError && (
+                  <p role="alert" className="font-semibold text-[#8F1D1D]">
+                    {keyError}
                   </p>
                 )}
               </div>

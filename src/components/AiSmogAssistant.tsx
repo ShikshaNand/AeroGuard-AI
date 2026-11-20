@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Bot,
   Send,
@@ -19,6 +19,8 @@ import type { IndoorAirSimulationResult } from '../domain/iaqCalculator';
 import type { AggregateImpactSummary } from '../domain/impactCalculator';
 import { generateSmogAssistantAdvice } from '../services/genAiService';
 import { calculateWhoMultiple, findOptimalVentilationWindows } from '../domain/airQualityEngine';
+import { sanitizeTextInput } from '../utils/security';
+import { SafeMarkdownText } from './SafeMarkdownText';
 
 interface AiSmogAssistantProps {
   location: LocationAirQuality;
@@ -58,83 +60,6 @@ const QUICK_PROMPTS = [
   },
 ];
 
-/**
- * Safe, XSS-free structured text renderer using native React nodes (never dangerouslySetInnerHTML).
- */
-function renderSafeFormattedLine(line: string, idx: number): React.ReactNode {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return <div key={idx} className="h-2" />;
-  }
-
-  if (trimmed === '---') {
-    return <hr key={idx} className="my-2 border-[#DFD2BE]" />;
-  }
-
-  if (trimmed.startsWith('### ')) {
-    return (
-      <h4 key={idx} className="mt-2 text-sm font-extrabold text-[#1B4D35]">
-        {renderBoldSpans(trimmed.slice(4))}
-      </h4>
-    );
-  }
-
-  if (trimmed.startsWith('#### ')) {
-    return (
-      <h5 key={idx} className="mt-2 text-xs font-extrabold uppercase tracking-wider text-[#7A4B00]">
-        {renderBoldSpans(trimmed.slice(5))}
-      </h5>
-    );
-  }
-
-  if (trimmed.startsWith('> ')) {
-    return (
-      <blockquote
-        key={idx}
-        className="beige-sage my-2 rounded-xl border-l-4 border-l-[#2D6A4F] px-3.5 py-2.5 text-xs text-[#1D3B2B]"
-      >
-        {renderBoldSpans(trimmed.slice(2))}
-      </blockquote>
-    );
-  }
-
-  if (trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
-    return (
-      <div key={idx} className="ml-2 flex items-start gap-2 text-xs text-[#3B3228] leading-relaxed">
-        <span className="text-[#2D6A4F] font-extrabold">•</span>
-        <span>{renderBoldSpans(trimmed.replace(/^-\s*/, ''))}</span>
-      </div>
-    );
-  }
-
-  return (
-    <p key={idx} className="text-xs text-[#3B3228] leading-relaxed">
-      {renderBoldSpans(trimmed)}
-    </p>
-  );
-}
-
-function renderBoldSpans(text: string): React.ReactNode[] {
-  const cleanedMath = text
-    .replace(/\$\\text\{PM\}_\{2\.5\}\$/g, 'PM₂.₅')
-    .replace(/\$\\text\{NO\}_x\$/g, 'NOₓ')
-    .replace(/\$\\text\{NO\}_2\$/g, 'NO₂')
-    .replace(/\$\\text\{CO\}_2\\text\{e\}\$/g, 'CO₂e')
-    .replace(/\$\\text\{CO\}_2\$/g, 'CO₂');
-
-  const parts = cleanedMath.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return (
-        <strong key={i} className="font-bold text-[#231D17]">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
-
 const CHAT_STORAGE_KEY = 'aeroguard_chat_history_v1';
 
 function loadSavedMessages(): ChatMessage[] {
@@ -155,13 +80,31 @@ function loadSavedMessages(): ChatMessage[] {
           (m.role === 'user' || m.role === 'assistant') &&
           typeof m.content === 'string'
       )
-      .slice(-20);
+      .slice(-20)
+      .map((m) => ({
+        id: sanitizeTextInput(m.id, 64) || `msg-${Date.now()}`,
+        role: m.role,
+        content: sanitizeTextInput(m.content, 4000),
+        timestamp: typeof m.timestamp === 'string' ? sanitizeTextInput(m.timestamp, 24) : '',
+        sourceMode: m.sourceMode === 'gemini-live' ? 'gemini-live' : 'expert-engine',
+        modelUsed: typeof m.modelUsed === 'string' ? sanitizeTextInput(m.modelUsed, 64) : undefined,
+        fallbackNotice:
+          typeof m.fallbackNotice === 'string'
+            ? sanitizeTextInput(m.fallbackNotice, 240)
+            : undefined,
+        keyMetricsCited: Array.isArray(m.keyMetricsCited)
+          ? m.keyMetricsCited
+              .filter((k): k is string => typeof k === 'string')
+              .slice(0, 6)
+              .map((k) => sanitizeTextInput(k, 120))
+          : undefined,
+      }));
   } catch {
     return [];
   }
 }
 
-export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = ({
+export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
   location,
   profile,
   iaqSim,
@@ -170,7 +113,10 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = ({
   sessionApiKey,
   onOpenFamilySettings,
 }) => {
-  const ventWindow = findOptimalVentilationWindows(location.hourlyForecast);
+  const ventWindow = useMemo(
+    () => findOptimalVentilationWindows(location.hourlyForecast),
+    [location.hourlyForecast]
+  );
   const whoMultiple = calculateWhoMultiple(location.pm25);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadSavedMessages());
@@ -402,9 +348,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = ({
                       ))}
                     </div>
                   )}
-                  <div className="space-y-1">
-                    {msg.content.split('\n').map((line, i) => renderSafeFormattedLine(line, i))}
-                  </div>
+                  <SafeMarkdownText content={msg.content} />
                   <div className="flex items-center justify-between border-t border-[#ECE2D0] pt-2 text-[10px] text-[#6A5E50]">
                     <span className="flex items-center gap-1 font-medium">
                       <ShieldCheck className="h-3 w-3 text-[#2D6A4F]" aria-hidden="true" />
@@ -462,4 +406,5 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = ({
       </form>
     </div>
   );
-};
+});
+AiSmogAssistant.displayName = 'AiSmogAssistant';

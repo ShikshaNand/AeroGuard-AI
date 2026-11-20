@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Home,
   Fan,
@@ -35,7 +35,7 @@ interface IndoorAirHacksProps {
   onChangeTargetAch: (ach: number) => void;
 }
 
-export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = ({
+export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = React.memo(({
   location,
   profile,
   onUpdateProfile,
@@ -49,10 +49,36 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = ({
 }) => {
   const [costFilter, setCostFilter] = useState<'ALL' | CostTier>('ALL');
 
-  const filteredHacks =
-    costFilter === 'ALL'
-      ? allHacks
-      : allHacks.filter((h) => h.costTier === costFilter);
+  const filteredHacks = useMemo(
+    () =>
+      costFilter === 'ALL'
+        ? allHacks
+        : allHacks.filter((h) => h.costTier === costFilter),
+    [allHacks, costFilter]
+  );
+
+  const humidityStatus = useMemo(() => {
+    const rh = profile.indoorRelativeHumidityPct;
+    if (rh > 60) {
+      return {
+        tone: 'beige-terracotta text-[#8F1D1D]',
+        label: `High Indoor Humidity (${rh}%)`,
+        advice: 'Sealed rooms above 60% RH encourage mold & dust mites — run kitchen/bath exhaust and pulse-ventilate at peak afternoon sun.',
+      };
+    }
+    if (rh < 35) {
+      return {
+        tone: 'beige-amber text-[#7A4B00]',
+        label: `Dry Winter Air (${rh}%)`,
+        advice: 'Air below 35% RH dries nasal mucosa and leaves PM2.5 suspended longer — aim for 40%–50% RH with an evaporative humidifier.',
+      };
+    }
+    return {
+      tone: 'beige-sage text-[#1B4D35]',
+      label: `Optimal Winter Humidity (${rh}%)`,
+      advice: '40%–50% RH keeps airways hydrated and accelerates indoor PM2.5 settling without mold risk.',
+    };
+  }, [profile.indoorRelativeHumidityPct]);
 
   return (
     <div className="space-y-6">
@@ -135,11 +161,16 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = ({
             </div>
           </div>
 
-          <div className="beige-sand mt-4 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs text-[#3B3228]">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-[#2D6A4F]" aria-hidden="true" />
-            <span>
-              <strong>Why Indoor Hacks Matter:</strong> Urban families spend 85–90% of winter hours indoors. Cutting indoor PM2.5 by {iaqSim.reductionPct}% lowers total 24-hour lung dose more than outdoor masks alone.
-            </span>
+          <div className="mt-4 space-y-2.5">
+            <div className="beige-sand flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs text-[#3B3228]">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-[#2D6A4F]" aria-hidden="true" />
+              <span>
+                <strong>Why Indoor Hacks Matter:</strong> Urban families spend 85–90% of winter hours indoors. Cutting indoor PM2.5 by {iaqSim.reductionPct}% lowers total 24-hour lung dose more than outdoor masks alone.
+              </span>
+            </div>
+            <div className={`${humidityStatus.tone} rounded-xl px-3.5 py-2 text-[11px] leading-snug`}>
+              <strong>{humidityStatus.label}:</strong> {humidityStatus.advice}
+            </div>
           </div>
         </div>
 
@@ -152,7 +183,7 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = ({
                 Room Purifier &amp; DIY Corsi-Rosenthal Box Calculator
               </h2>
               <span className="rounded-full bg-[#EFE7D9] border border-[#DDD0BC] px-2.5 py-0.5 text-xs font-bold text-[#4E4439]">
-                5× Clean Air / Hour
+                {targetAch}× Clean Air / Hour
               </span>
             </div>
             <p className="mt-1 text-xs text-[#5C5246]">
@@ -389,4 +420,5 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = ({
       </RevealOnScroll>
     </div>
   );
-};
+});
+IndoorAirHacks.displayName = 'IndoorAirHacks';

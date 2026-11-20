@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Leaf,
   Users,
@@ -32,7 +32,7 @@ interface SustainableSwapsProps {
   impactSummary: AggregateImpactSummary;
 }
 
-export const SustainableSwaps: React.FC<SustainableSwapsProps> = ({
+export const SustainableSwaps: React.FC<SustainableSwapsProps> = React.memo(({
   location,
   profile,
   allSwaps,
@@ -42,7 +42,16 @@ export const SustainableSwaps: React.FC<SustainableSwapsProps> = ({
   onChangeCommunityHouseholdsCount,
   impactSummary,
 }) => {
-  const [copiedPledge, setCopiedPledge] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleCopyCommunityPledge = async () => {
     const pledgeText = [
@@ -53,16 +62,20 @@ export const SustainableSwaps: React.FC<SustainableSwapsProps> = ({
       `• Neighborhood Multiplier: If ${communityHouseholdsCount} families in our community join for 90 winter days, we eliminate ${impactSummary.communityWinterPmAndNoxSavedKg} kg of street-level smog (PM2.5+NOx) and ${impactSummary.communityWinterCo2SavedTons} tons of CO2e (≈ ${impactSummary.equivalentTreesCount} mature urban trees)!`,
     ].join('\n');
 
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(pledgeText);
-      }
-      setCopiedPledge(true);
-      setTimeout(() => setCopiedPledge(false), 3000);
-    } catch {
-      setCopiedPledge(true);
-      setTimeout(() => setCopiedPledge(false), 3000);
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
     }
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(pledgeText);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('failed');
+    }
+    copyTimerRef.current = setTimeout(() => setCopyStatus('idle'), 3000);
   };
 
   return (
@@ -83,12 +96,18 @@ export const SustainableSwaps: React.FC<SustainableSwapsProps> = ({
           <button
             type="button"
             onClick={handleCopyCommunityPledge}
+            aria-live="polite"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-4 py-2.5 text-xs font-bold text-[#FFFDF8] shadow-sm hover:bg-[#1B4D35] transition shrink-0"
           >
-            {copiedPledge ? (
+            {copyStatus === 'copied' ? (
               <>
                 <Check className="h-4 w-4" aria-hidden="true" />
                 <span>Pledge Copied for WhatsApp / RWA!</span>
+              </>
+            ) : copyStatus === 'failed' ? (
+              <>
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                <span>Clipboard Blocked — Copy Manually</span>
               </>
             ) : (
               <>
@@ -298,4 +317,5 @@ export const SustainableSwaps: React.FC<SustainableSwapsProps> = ({
       </RevealOnScroll>
     </div>
   );
-};
+});
+SustainableSwaps.displayName = 'SustainableSwaps';

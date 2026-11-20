@@ -1,13 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Clock,
   Home,
   Leaf,
   Bot,
   ShieldAlert,
-  Users,
-  Minus,
-  Plus,
 } from 'lucide-react';
 import type { FamilyProfile, LocationAirQuality } from './types';
 import {
@@ -38,7 +35,9 @@ import {
   adjustMemberCount as applyMemberDelta,
   type MemberCountField,
 } from './domain/familyMembers';
+import { useToggleSet } from './hooks/useToggleSet';
 import { HeaderBanner } from './components/HeaderBanner';
+import { SidebarNav, type SidebarTabDefinition } from './components/SidebarNav';
 import { AirStatusHero } from './components/AirStatusHero';
 import { FamilyProfileBar } from './components/FamilyProfileBar';
 import { RoutinePlanner } from './components/RoutinePlanner';
@@ -47,13 +46,6 @@ import { SustainableSwaps } from './components/SustainableSwaps';
 import { AiSmogAssistant } from './components/AiSmogAssistant';
 
 type ActiveTabId = PersistedTabId;
-
-interface TabDefinition {
-  id: ActiveTabId;
-  label: string;
-  helper: string;
-  icon: React.ReactNode;
-}
 
 export function App() {
   const [initialState] = useState(() => loadPersistedState());
@@ -66,19 +58,15 @@ export function App() {
   // SECURITY: API key is kept strictly in volatile RAM and never persisted to localStorage
   const [sessionApiKey, setSessionApiKey] = useState('');
 
-  // Adopted Low-Emission Daily Routines
-  const [adoptedRoutineIds, setAdoptedRoutineIds] = useState<Set<string>>(
-    () => new Set(initialState.adoptedRoutineIds)
+  // Adopted Low-Emission Daily Routines, Indoor Air Hacks & Sustainable Swaps (via shared hook)
+  const [adoptedRoutineIds, handleToggleRoutine, setAdoptedRoutineIds] = useToggleSet(
+    initialState.adoptedRoutineIds
   );
-
-  // Active Indoor Air Quality Hacks
-  const [activeHackIds, setActiveHackIds] = useState<Set<string>>(
-    () => new Set(initialState.activeHackIds)
+  const [activeHackIds, handleToggleHack, setActiveHackIds] = useToggleSet(
+    initialState.activeHackIds
   );
-
-  // Selected Sustainable Lifestyle Swaps
-  const [selectedSwapIds, setSelectedSwapIds] = useState<Set<string>>(
-    () => new Set(initialState.selectedSwapIds)
+  const [selectedSwapIds, handleToggleSwap, setSelectedSwapIds] = useToggleSet(
+    initialState.selectedSwapIds
   );
 
   const [targetAch, setTargetAch] = useState(initialState.targetAch);
@@ -86,9 +74,22 @@ export function App() {
     initialState.communityHouseholdsCount
   );
 
-  // Auto-save user data safely to localStorage so nothing is lost on page refresh
+  const latestPersistedStateRef = useRef({
+    profile,
+    location,
+    adoptedRoutineIds: Array.from(adoptedRoutineIds),
+    activeHackIds: Array.from(activeHackIds),
+    selectedSwapIds: Array.from(selectedSwapIds),
+    targetAch,
+    communityHouseholdsCount,
+    theme,
+    activeTab,
+  });
+
+  // Debounced auto-save to localStorage (avoids blocking main thread during rapid slider drags)
+  // while flushing immediately on unmount or page unload so zero data is ever lost.
   useEffect(() => {
-    savePersistedState({
+    const snapshot = {
       profile,
       location,
       adoptedRoutineIds: Array.from(adoptedRoutineIds),
@@ -98,7 +99,24 @@ export function App() {
       communityHouseholdsCount,
       theme,
       activeTab,
-    });
+    };
+    latestPersistedStateRef.current = snapshot;
+
+    const timer = setTimeout(() => {
+      savePersistedState(snapshot);
+    }, 150);
+
+    const flush = () => {
+      clearTimeout(timer);
+      savePersistedState(latestPersistedStateRef.current);
+    };
+
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      clearTimeout(timer);
+      savePersistedState(latestPersistedStateRef.current);
+    };
   }, [
     profile,
     location,
@@ -116,9 +134,9 @@ export function App() {
     const defaults = getDefaultPersistedState();
     setProfile(defaults.profile);
     setLocation(defaults.location);
-    setAdoptedRoutineIds(new Set(defaults.adoptedRoutineIds));
-    setActiveHackIds(new Set(defaults.activeHackIds));
-    setSelectedSwapIds(new Set(defaults.selectedSwapIds));
+    setAdoptedRoutineIds(defaults.adoptedRoutineIds);
+    setActiveHackIds(defaults.activeHackIds);
+    setSelectedSwapIds(defaults.selectedSwapIds);
     setTargetAch(defaults.targetAch);
     setCommunityHouseholdsCount(defaults.communityHouseholdsCount);
     setTheme(defaults.theme);
@@ -134,9 +152,17 @@ export function App() {
   }, [theme]);
 
   // Quick member adjustment helper for sidebar + family drawer
-  const adjustMemberCount = (field: MemberCountField, delta: number) => {
+  const adjustMemberCount = useCallback((field: MemberCountField, delta: number) => {
     setProfile((prev) => applyMemberDelta(prev, field, delta));
-  };
+  }, []);
+
+  const handleToggleFamilyDrawer = useCallback(() => {
+    setShowFamilyDrawer((prev) => !prev);
+  }, []);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  }, []);
 
   // Memoized Domain Computations
   const routines = useMemo(
@@ -192,93 +218,39 @@ export function App() {
     [location.hourlyForecast]
   );
 
-  const handleToggleRoutine = (routineId: string) => {
-    setAdoptedRoutineIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(routineId)) {
-        next.delete(routineId);
-      } else {
-        next.add(routineId);
-      }
-      return next;
-    });
-  };
+  const handleAdoptAllRoutines = useCallback(() => {
+    setAdoptedRoutineIds(routines.map((r) => r.id));
+  }, [routines, setAdoptedRoutineIds]);
 
-  const handleAdoptAllRoutines = () => {
-    setAdoptedRoutineIds(new Set(routines.map((r) => r.id)));
-  };
-
-  const handleToggleHack = (hackId: string) => {
-    setActiveHackIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(hackId)) {
-        next.delete(hackId);
-      } else {
-        next.add(hackId);
-      }
-      return next;
-    });
-  };
-
-  const handleToggleSwap = (swapId: string) => {
-    setSelectedSwapIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(swapId)) {
-        next.delete(swapId);
-      } else {
-        next.add(swapId);
-      }
-      return next;
-    });
-  };
-
-  const tabs: TabDefinition[] = [
-    {
-      id: 'routines',
-      label: 'Daily Plan & Air Hours',
-      helper: 'When to go out & ventilate',
-      icon: <Clock className="h-4 w-4" aria-hidden="true" />,
-    },
-    {
-      id: 'iaq-hacks',
-      label: 'Clean Indoor Air',
-      helper: 'Home hacks & DIY filter guide',
-      icon: <Home className="h-4 w-4" aria-hidden="true" />,
-    },
-    {
-      id: 'sustainable-swaps',
-      label: 'Eco Swaps & Community',
-      helper: 'Neighborhood impact & pledge',
-      icon: <Leaf className="h-4 w-4" aria-hidden="true" />,
-    },
-    {
-      id: 'ai-assistant',
-      label: 'Ask AeroGuard AI',
-      helper: 'Personal clean-air coach',
-      icon: <Bot className="h-4 w-4" aria-hidden="true" />,
-    },
-  ];
-
-  const handleTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveTab(tabs[(idx + 1) % tabs.length].id);
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length].id);
-    }
-  };
-
-  const sidebarMemberRows: Array<{
-    key: 'adultsCount' | 'childrenCount' | 'seniorsCount' | 'respiratoryCareCount' | 'petsCount';
-    label: string;
-  }> = [
-    { key: 'adultsCount', label: 'Adults' },
-    { key: 'childrenCount', label: 'Kids / Infants' },
-    { key: 'seniorsCount', label: 'Seniors (65+)' },
-    { key: 'respiratoryCareCount', label: 'Asthma Care' },
-    { key: 'petsCount', label: 'Pets' },
-  ];
+  const tabs = useMemo<SidebarTabDefinition[]>(
+    () => [
+      {
+        id: 'routines',
+        label: 'Daily Plan & Air Hours',
+        helper: 'When to go out & ventilate',
+        icon: <Clock className="h-4 w-4" aria-hidden="true" />,
+      },
+      {
+        id: 'iaq-hacks',
+        label: 'Clean Indoor Air',
+        helper: 'Home hacks & DIY filter guide',
+        icon: <Home className="h-4 w-4" aria-hidden="true" />,
+      },
+      {
+        id: 'sustainable-swaps',
+        label: 'Eco Swaps & Community',
+        helper: 'Neighborhood impact & pledge',
+        icon: <Leaf className="h-4 w-4" aria-hidden="true" />,
+      },
+      {
+        id: 'ai-assistant',
+        label: 'Ask AeroGuard AI',
+        helper: 'Personal clean-air coach',
+        icon: <Bot className="h-4 w-4" aria-hidden="true" />,
+      },
+    ],
+    []
+  );
 
   return (
     <div className="app-shell min-h-screen flex flex-col bg-[#F7F3EA] text-[#2B241D]">
@@ -288,9 +260,9 @@ export function App() {
         onSelectLocation={setLocation}
         profile={profile}
         showFamilyDrawer={showFamilyDrawer}
-        onToggleFamilyDrawer={() => setShowFamilyDrawer((prev) => !prev)}
+        onToggleFamilyDrawer={handleToggleFamilyDrawer}
         theme={theme}
-        onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+        onToggleTheme={handleToggleTheme}
         sessionApiKey={sessionApiKey}
         onSaveSessionApiKey={setSessionApiKey}
       />
@@ -298,105 +270,14 @@ export function App() {
       {/* Full-Width Modern Edge-to-Edge App Shell (Zero Wasted Side Space) */}
       <div className="flex w-full flex-1 flex-col lg:flex-row">
         {/* Pinned Warm-Sand Left Sidebar Rail */}
-        <aside className="beige-sidebar w-full lg:w-72 xl:w-80 shrink-0 px-4 py-5 sm:px-6 lg:sticky lg:top-[61px] lg:h-[calc(100vh-61px)] lg:overflow-y-auto space-y-5">
-          <nav aria-label="Main guide sections">
-            <span className="hidden lg:block px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#7A6E60]">
-              Navigation
-            </span>
-            <div
-              role="tablist"
-              aria-orientation="vertical"
-              className="stagger-children grid grid-cols-2 gap-2 lg:grid-cols-1"
-            >
-              {tabs.map((tab, idx) => {
-                const isSelected = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`tab-${tab.id}`}
-                    role="tab"
-                    type="button"
-                    aria-selected={isSelected}
-                    aria-controls={`panel-${tab.id}`}
-                    tabIndex={isSelected ? 0 : -1}
-                    onClick={() => setActiveTab(tab.id)}
-                    onKeyDown={(e) => handleTabKeyDown(e, idx)}
-                    className={`hc-card flex flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-all duration-200 ${
-                      isSelected
-                        ? 'border-[#2D6A4F] bg-[#2D6A4F] text-[#FFFDF8] shadow-sm translate-x-0.5'
-                        : 'border-transparent bg-[#FAF6EE]/80 text-[#2B241D] hover:bg-[#FFFDF9] hover:border-[#DFD2BE]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5 text-xs font-extrabold">
-                      <span className={isSelected ? 'text-[#D8F3DC]' : 'text-[#2D6A4F]'}>
-                        {tab.icon}
-                      </span>
-                      <span>{tab.label}</span>
-                    </span>
-                    <span
-                      className={`text-[11px] pl-6 leading-snug ${
-                        isSelected ? 'text-[#E3F2E8]' : 'text-[#6A5E50]'
-                      }`}
-                    >
-                      {tab.helper}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-
-          {/* Quick Member Values Adjuster Card (Always 1 click away on Desktop) */}
-          <div className="beige-panel hc-card animate-reveal-up reveal-delay-3 hidden lg:block rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-[#ECE2D0] pb-2">
-              <span className="text-xs font-extrabold text-[#231D17] flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
-                Family Members ({profile.householdSize})
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowFamilyDrawer((prev) => !prev)}
-                className="text-[11px] font-bold text-[#1B4D35] hover:underline"
-              >
-                Home Settings
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {sidebarMemberRows.map((row) => (
-                <div
-                  key={row.key}
-                  className="flex items-center justify-between text-xs"
-                >
-                  <span className="text-[#4E4439] font-semibold">{row.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => adjustMemberCount(row.key, -1)}
-                      disabled={profile[row.key] <= 0}
-                      aria-label={`Quick decrease ${row.label}`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DFD2BE] bg-[#FAF6EE] text-[#2B241D] hover:bg-[#EAE0CE] active:scale-95 disabled:opacity-35 transition"
-                    >
-                      <Minus className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                    <span className="w-6 text-center font-extrabold text-[#231D17]">
-                      {profile[row.key]}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => adjustMemberCount(row.key, 1)}
-                      disabled={profile[row.key] >= 10}
-                      aria-label={`Quick increase ${row.label}`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DFD2BE] bg-[#FAF6EE] text-[#2B241D] hover:bg-[#EAE0CE] active:scale-95 disabled:opacity-35 transition"
-                    >
-                      <Plus className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
+        <SidebarNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          profile={profile}
+          onAdjustMemberCount={adjustMemberCount}
+          onToggleFamilyDrawer={handleToggleFamilyDrawer}
+        />
 
         {/* Full-Width Spacious Main Content Area */}
         <div className="flex min-w-0 flex-1 flex-col">

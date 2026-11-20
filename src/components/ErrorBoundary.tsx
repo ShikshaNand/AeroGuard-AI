@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldAlert, RotateCcw } from 'lucide-react';
 import { clearPersistedState } from '../utils/storage';
+import { sanitizeTextInput } from '../utils/security';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -29,13 +30,14 @@ export class ErrorBoundary extends React.Component<
   }
 
   public static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
-    const message =
+    const rawMessage =
       error instanceof Error
         ? error.message
         : 'An unexpected application error occurred.';
     return {
       hasError: true,
-      errorMessage: message,
+      errorMessage:
+        sanitizeTextInput(rawMessage, 180) || 'An unexpected application error occurred.',
     };
   }
 
@@ -50,7 +52,7 @@ export class ErrorBoundary extends React.Component<
         <main
           role="alert"
           aria-live="assertive"
-          className="min-h-screen flex items-center justify-center bg-[#F7F3EA] p-6 text-[#2B241D]"
+          className="app-shell min-h-screen flex items-center justify-center bg-[#F7F3EA] p-6 text-[#2B241D]"
         >
           <div className="beige-panel max-w-md rounded-3xl p-6 text-center space-y-4">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FDF1EC] border border-[#EBC5B5] text-[#9A3412]">

@@ -1,14 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
   Home,
-  Fan,
   CheckSquare,
   Square,
   Sparkles,
-  DollarSign,
   ShieldCheck,
   AlertCircle,
-  Sliders,
 } from 'lucide-react';
 import type {
   CADRSizingResult,
@@ -21,6 +18,7 @@ import type { IndoorAirSimulationResult } from '../domain/iaqCalculator';
 import { WHO_24H_PM25_LIMIT } from '../domain/airQualityEngine';
 import { SlideDeckContainer } from './SlideDeckContainer';
 import { RevealOnScroll } from './RevealOnScroll';
+import { CadrSizingCard } from './CadrSizingCard';
 
 interface IndoorAirHacksProps {
   location: LocationAirQuality;
@@ -175,120 +173,13 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = React.memo(({
         </div>
 
         {/* Right 6 cols: Interactive CADR & DIY Corsi-Rosenthal Box Sizing Calculator */}
-        <div className="beige-panel hc-card lg:col-span-6 rounded-3xl p-5 sm:p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-extrabold text-[#231D17] flex items-center gap-2">
-                <Fan className="h-5 w-5 text-[#2D6A4F]" aria-hidden="true" />
-                Room Purifier &amp; DIY Corsi-Rosenthal Box Calculator
-              </h2>
-              <span className="rounded-full bg-[#EFE7D9] border border-[#DDD0BC] px-2.5 py-0.5 text-xs font-bold text-[#4E4439]">
-                {targetAch}× Clean Air / Hour
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-[#5C5246]">
-              Slide your room size below to see how a low-cost $58 DIY filter box (fan + 4 MERV-13 filters) compares with a store-bought HEPA purifier.
-            </p>
-
-            {/* Interactive Room Area & Target ACH Sliders (Spacious Full-Width Rows) */}
-            <div className="beige-inset mt-4 grid grid-cols-1 gap-4 rounded-2xl p-4">
-              <div>
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <label htmlFor="cadr-area-slider" className="text-[#3E352B] font-bold">
-                    Room Floor Area
-                  </label>
-                  <span className="rounded-md bg-[#FFFDF8] border border-[#E5DAC8] px-2 py-0.5 font-extrabold text-[#1B4D35]">
-                    {profile.mainRoomAreaSqM} m² ({cadrSizing.roomVolumeCubicM} m³)
-                  </span>
-                </div>
-                <input
-                  id="cadr-area-slider"
-                  type="range"
-                  min={10}
-                  max={90}
-                  value={profile.mainRoomAreaSqM}
-                  onChange={(e) =>
-                    onUpdateProfile({
-                      ...profile,
-                      mainRoomAreaSqM: Number(e.target.value),
-                    })
-                  }
-                  className="mt-2 w-full accent-[#2D6A4F]"
-                />
-              </div>
-
-              <div className="border-t border-[#E6DAC7] pt-3">
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <label htmlFor="cadr-ach-slider" className="text-[#3E352B] font-bold flex items-center gap-1.5">
-                    <Sliders className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
-                    Clean Air Cycles Per Hour
-                  </label>
-                  <span className="rounded-md bg-[#FFFDF8] border border-[#E5DAC8] px-2 py-0.5 font-extrabold text-[#1B4D35]">
-                    {targetAch}× / hour
-                  </span>
-                </div>
-                <input
-                  id="cadr-ach-slider"
-                  type="range"
-                  min={3}
-                  max={8}
-                  value={targetAch}
-                  onChange={(e) => onChangeTargetAch(Number(e.target.value))}
-                  className="mt-2 w-full accent-[#2D6A4F]"
-                />
-              </div>
-            </div>
-
-            {/* Required CADR & Side-by-Side Comparison Containers */}
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="beige-sage rounded-xl p-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-[#163D2A]">
-                    DIY Corsi-Rosenthal Box
-                  </span>
-                  <span className="rounded-md bg-[#2D6A4F] text-[#FFFDF8] px-2 py-0.5 text-[11px] font-bold">
-                    ~${cadrSizing.corsiEstimatedCostUsd} Total
-                  </span>
-                </div>
-                <p className="mt-2 text-2xl font-extrabold text-[#163D2A]">
-                  {cadrSizing.corsiRosenthalBoxesNeeded} Unit{cadrSizing.corsiRosenthalBoxesNeeded > 1 ? 's' : ''}
-                </p>
-                <p className="mt-1 text-[11px] text-[#2F523E] leading-relaxed">
-                  4× MERV-13 filters + 20&quot; box fan (~600 m³/h CADR per box). Drops room PM2.5 to{' '}
-                  <strong className="text-[#163D2A]">~{cadrSizing.projectedIndoorPm25WithCorsi} µg/m³</strong>.
-                </p>
-              </div>
-
-              <div className="beige-inset rounded-xl p-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#3E352B]">
-                    Commercial True-HEPA
-                  </span>
-                  <span className="rounded-md bg-[#E5D9C5] text-[#2B241D] px-2 py-0.5 text-[11px] font-bold">
-                    ~${cadrSizing.commercialEstimatedCostUsd} Total
-                  </span>
-                </div>
-                <p className="mt-2 text-2xl font-extrabold text-[#231D17]">
-                  {cadrSizing.commercialHepaUnitsNeeded} Unit{cadrSizing.commercialHepaUnitsNeeded > 1 ? 's' : ''}
-                </p>
-                <p className="mt-1 text-[11px] text-[#5C5246] leading-relaxed">
-                  Required Room CADR: <strong>{cadrSizing.requiredCadrCubicMPerHour} m³/h</strong> ({cadrSizing.requiredCadrCfm} CFM) at medium quiet speed.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="beige-sand mt-4 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs text-[#3B3228]">
-            <span className="flex items-center gap-1.5">
-              <DollarSign className="h-4 w-4 text-[#2D6A4F]" aria-hidden="true" />
-              DIY Savings:{' '}
-              <strong className="text-[#1B4D35]">
-                ${Math.max(0, cadrSizing.commercialEstimatedCostUsd - cadrSizing.corsiEstimatedCostUsd)} saved
-              </strong>{' '}
-              for equal or higher MERV-13 fine-soot capture
-            </span>
-          </div>
-        </div>
+        <CadrSizingCard
+          profile={profile}
+          onUpdateProfile={onUpdateProfile}
+          cadrSizing={cadrSizing}
+          targetAch={targetAch}
+          onChangeTargetAch={onChangeTargetAch}
+        />
       </div>
 
       {/* Bottom: Interactive Indoor Air Quality Hacks Slide Deck */}

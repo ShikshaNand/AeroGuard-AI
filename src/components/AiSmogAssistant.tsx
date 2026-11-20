@@ -19,7 +19,7 @@ import type { IndoorAirSimulationResult } from '../domain/iaqCalculator';
 import type { AggregateImpactSummary } from '../domain/impactCalculator';
 import { generateSmogAssistantAdvice } from '../services/genAiService';
 import { calculateWhoMultiple, findOptimalVentilationWindows } from '../domain/airQualityEngine';
-import { sanitizeTextInput } from '../utils/security';
+import { loadSavedChatMessages, saveChatMessages } from '../utils/chatStorage';
 import { SafeMarkdownText } from './SafeMarkdownText';
 
 interface AiSmogAssistantProps {
@@ -60,50 +60,6 @@ const QUICK_PROMPTS = [
   },
 ];
 
-const CHAT_STORAGE_KEY = 'aeroguard_chat_history_v1';
-
-function loadSavedMessages(): ChatMessage[] {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return [];
-    }
-    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (m): m is ChatMessage =>
-          m &&
-          typeof m === 'object' &&
-          typeof m.id === 'string' &&
-          (m.role === 'user' || m.role === 'assistant') &&
-          typeof m.content === 'string'
-      )
-      .slice(-20)
-      .map((m) => ({
-        id: sanitizeTextInput(m.id, 64) || `msg-${Date.now()}`,
-        role: m.role,
-        content: sanitizeTextInput(m.content, 4000),
-        timestamp: typeof m.timestamp === 'string' ? sanitizeTextInput(m.timestamp, 24) : '',
-        sourceMode: m.sourceMode === 'gemini-live' ? 'gemini-live' : 'expert-engine',
-        modelUsed: typeof m.modelUsed === 'string' ? sanitizeTextInput(m.modelUsed, 64) : undefined,
-        fallbackNotice:
-          typeof m.fallbackNotice === 'string'
-            ? sanitizeTextInput(m.fallbackNotice, 240)
-            : undefined,
-        keyMetricsCited: Array.isArray(m.keyMetricsCited)
-          ? m.keyMetricsCited
-              .filter((k): k is string => typeof k === 'string')
-              .slice(0, 6)
-              .map((k) => sanitizeTextInput(k, 120))
-          : undefined,
-      }));
-  } catch {
-    return [];
-  }
-}
-
 export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
   location,
   profile,
@@ -119,23 +75,13 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
   );
   const whoMultiple = calculateWhoMultiple(location.pm25);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadSavedMessages());
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadSavedChatMessages());
   const [inputDraft, setInputDraft] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        if (messages.length === 0) {
-          window.localStorage.removeItem(CHAT_STORAGE_KEY);
-        } else {
-          window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-20)));
-        }
-      }
-    } catch {
-      // Ignore private-mode storage errors
-    }
+    saveChatMessages(messages);
   }, [messages]);
 
   useEffect(() => {

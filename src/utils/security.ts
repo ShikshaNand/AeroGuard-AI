@@ -7,8 +7,7 @@
 const HTML_TAG_REGEX = /<\/?[^>]+(>|$)/g;
 const DANGEROUS_SCHEME_REGEX = /(javascript|data|vbscript)\s*:/gi;
 const EVENT_HANDLER_REGEX = /\bon\w+\s*=/gi;
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+const CONTROL_CHARS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 const PROMPT_INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?(previous|prior|system)\s+instructions/i,

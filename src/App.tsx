@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Clock,
   Home,
@@ -15,7 +15,6 @@ import {
   clearPersistedState,
   getDefaultPersistedState,
   loadPersistedState,
-  savePersistedState,
   type PersistedTabId,
   type ThemeMode,
 } from './utils/storage';
@@ -36,6 +35,7 @@ import {
   type MemberCountField,
 } from './domain/familyMembers';
 import { useToggleSet } from './hooks/useToggleSet';
+import { useDebouncedPersistState } from './hooks/usePersistedAppState';
 import { HeaderBanner } from './components/HeaderBanner';
 import { SidebarNav, type SidebarTabDefinition } from './components/SidebarNav';
 import { AirStatusHero } from './components/AirStatusHero';
@@ -74,22 +74,8 @@ export function App() {
     initialState.communityHouseholdsCount
   );
 
-  const latestPersistedStateRef = useRef({
-    profile,
-    location,
-    adoptedRoutineIds: Array.from(adoptedRoutineIds),
-    activeHackIds: Array.from(activeHackIds),
-    selectedSwapIds: Array.from(selectedSwapIds),
-    targetAch,
-    communityHouseholdsCount,
-    theme,
-    activeTab,
-  });
-
-  // Debounced auto-save to localStorage (avoids blocking main thread during rapid slider drags)
-  // while flushing immediately on unmount or page unload so zero data is ever lost.
-  useEffect(() => {
-    const snapshot = {
+  const persistedSnapshot = useMemo(
+    () => ({
       profile,
       location,
       adoptedRoutineIds: Array.from(adoptedRoutineIds),
@@ -99,35 +85,21 @@ export function App() {
       communityHouseholdsCount,
       theme,
       activeTab,
-    };
-    latestPersistedStateRef.current = snapshot;
+    }),
+    [
+      profile,
+      location,
+      adoptedRoutineIds,
+      activeHackIds,
+      selectedSwapIds,
+      targetAch,
+      communityHouseholdsCount,
+      theme,
+      activeTab,
+    ]
+  );
 
-    const timer = setTimeout(() => {
-      savePersistedState(snapshot);
-    }, 150);
-
-    const flush = () => {
-      clearTimeout(timer);
-      savePersistedState(latestPersistedStateRef.current);
-    };
-
-    window.addEventListener('beforeunload', flush);
-    return () => {
-      window.removeEventListener('beforeunload', flush);
-      clearTimeout(timer);
-      savePersistedState(latestPersistedStateRef.current);
-    };
-  }, [
-    profile,
-    location,
-    adoptedRoutineIds,
-    activeHackIds,
-    selectedSwapIds,
-    targetAch,
-    communityHouseholdsCount,
-    theme,
-    activeTab,
-  ]);
+  useDebouncedPersistState(persistedSnapshot);
 
   const handleResetDefaults = () => {
     clearPersistedState();

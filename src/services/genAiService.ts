@@ -19,10 +19,8 @@ import type { IndoorAirSimulationResult } from '../domain/iaqCalculator';
 import type { AggregateImpactSummary } from '../domain/impactCalculator';
 import { TTLCache } from '../utils/cache';
 import { SlidingWindowRateLimiter, validatePromptSafety } from '../utils/security';
-import {
-  executeLiveGeminiRequest,
-  hasClientGeminiKey,
-} from './geminiApiClient';
+import { executeLiveGeminiRequest, hasClientGeminiKey } from './geminiApiClient';
+import type { GroundedPromptContext } from './geminiProtocol';
 
 export interface AssistantContextPayload {
   location: LocationAirQuality;
@@ -82,18 +80,39 @@ function buildProfileFingerprint(profile: FamilyProfile, optimizedIndoorPm25: nu
   ].join('|');
 }
 
-function buildSystemContextPrompt(ctx: ExpertAdviceContext): string {
-  const { location, profile, memberSummary, iaqSim, cadrSizing, impactSummary, bestVentWindow, whoMultiple, cigsEq } =
-    ctx;
-  return [
-    'You are AeroGuard AI, a friendly, clear environmental scientist and family clean-air coach.',
-    `Current Location: ${location.city}, ${location.country} | US AQI: ${location.usAqi} | PM2.5: ${location.pm25} µg/m³ (${whoMultiple}x WHO limit, ~${cigsEq} passive cigarettes/day) | PM10: ${location.pm10} µg/m³ | NO2: ${location.no2} µg/m³ | Temp: ${location.temperatureC}°C | Wind: ${location.windSpeedKmh} km/h.`,
-    `Best Afternoon Ventilation Window Today: ${bestVentWindow}.`,
-    `Household Profile ("${profile.familyName}", ${profile.householdSize} total people): ${memberSummary}. Commute: ${profile.commuteMode} (${profile.dailyCommuteKm} km/day). Heating: ${profile.heatingType}. Cooking: ${profile.cookingType}. Main room: ${profile.mainRoomAreaSqM} m² (${cadrSizing.roomVolumeCubicM} m³).`,
-    `Indoor Air Simulation: Baseline ${iaqSim.baselineIndoorPm25} µg/m³ -> Optimized ${iaqSim.optimizedIndoorPm25} µg/m³ (-${iaqSim.reductionPct}%). Required CADR for ${cadrSizing.targetAirChangesPerHour} ACH: ${cadrSizing.requiredCadrCubicMPerHour} m³/h (${cadrSizing.corsiRosenthalBoxesNeeded} DIY Corsi-Rosenthal box).`,
-    `Direct Impact Potential: ${impactSummary.dailyPersonalDoseSavedUg} µg/day inhaled PM2.5 avoided per person (${impactSummary.familyWinterDoseSavedMg} mg across all ${profile.householdSize} members over winter); ${impactSummary.householdDailyCo2SavedKg} kg CO2e/day and ${impactSummary.householdDailyPmAndNoxSavedGrams} g PM2.5+NOx/day saved.`,
-    'Respond in warm, simple, easy-to-read English with clear bullet points, referencing their exact family member counts and live numbers, and include a clear "Direct Impact Explained" summary.',
-  ].join('\n');
+function toGroundedPromptContext(ctx: ExpertAdviceContext): GroundedPromptContext {
+  return {
+    city: ctx.location.city,
+    country: ctx.location.country,
+    usAqi: ctx.location.usAqi,
+    pm25: ctx.location.pm25,
+    pm10: ctx.location.pm10,
+    no2: ctx.location.no2,
+    temperatureC: ctx.location.temperatureC,
+    windSpeedKmh: ctx.location.windSpeedKmh,
+    whoMultiple: ctx.whoMultiple,
+    cigsEq: ctx.cigsEq,
+    bestVentWindow: ctx.bestVentWindow,
+    familyName: ctx.profile.familyName,
+    householdSize: ctx.profile.householdSize,
+    memberSummary: ctx.memberSummary,
+    commuteMode: ctx.profile.commuteMode,
+    dailyCommuteKm: ctx.profile.dailyCommuteKm,
+    heatingType: ctx.profile.heatingType,
+    cookingType: ctx.profile.cookingType,
+    mainRoomAreaSqM: ctx.profile.mainRoomAreaSqM,
+    roomVolumeCubicM: ctx.cadrSizing.roomVolumeCubicM,
+    baselineIndoorPm25: ctx.iaqSim.baselineIndoorPm25,
+    optimizedIndoorPm25: ctx.iaqSim.optimizedIndoorPm25,
+    reductionPct: ctx.iaqSim.reductionPct,
+    targetAch: ctx.cadrSizing.targetAirChangesPerHour,
+    requiredCadrCubicMPerHour: ctx.cadrSizing.requiredCadrCubicMPerHour,
+    corsiRosenthalBoxesNeeded: ctx.cadrSizing.corsiRosenthalBoxesNeeded,
+    dailyPersonalDoseSavedUg: ctx.impactSummary.dailyPersonalDoseSavedUg,
+    familyWinterDoseSavedMg: ctx.impactSummary.familyWinterDoseSavedMg,
+    householdDailyCo2SavedKg: ctx.impactSummary.householdDailyCo2SavedKg,
+    householdDailyPmAndNoxSavedGrams: ctx.impactSummary.householdDailyPmAndNoxSavedGrams,
+  };
 }
 
 /**
@@ -161,8 +180,8 @@ export async function generateSmogAssistantAdvice(
   };
 
   const liveOutcome = await executeLiveGeminiRequest(
-    buildSystemContextPrompt(adviceContext),
     prompt,
+    toGroundedPromptContext(adviceContext),
     sessionApiKey
   );
 

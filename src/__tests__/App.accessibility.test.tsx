@@ -8,7 +8,7 @@ describe('AeroGuard AI Application Integration, Member Controls & AI Coach', () 
   beforeEach(() => {
     window.localStorage.clear();
     vi.spyOn(geminiApiClient, 'checkServerGeminiProxy').mockImplementation(
-      () => new Promise<boolean>(() => {})
+      () => new Promise<boolean>(() => { })
     );
   });
 

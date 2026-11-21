@@ -1,24 +1,16 @@
 /**
- * Google Gemini API & Same-Origin Serverless Proxy Client
- * Supports:
- * 1. Same-origin `/api/gemini` Vercel Serverless Proxy (zero client-side API key exposure)
- * 2. Direct browser Gemini calls via optional RAM-only session key or build-time VITE_GEMINI_API_KEY
- * Includes automatic HTTP 404 model discovery via `v1beta/models` and 14-second abort timeouts.
+ * Browser Gemini Client & Same-Origin Vercel Proxy Connector
+ * Routes live requests securely through `/api/gemini` (sending structured context,
+ * never client-controlled system prompts) when available on Vercel, or uses an
+ * optional RAM-only session key / local dev key via the shared `geminiProtocol`.
  */
 
 import { sanitizeTextInput } from '../utils/security';
-
-export const DEFAULT_GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash',
-] as const;
-
-interface GeminiListModelItem {
-  name?: string;
-  supportedGenerationMethods?: string[];
-}
+import {
+  buildGroundedSystemPrompt,
+  callGeminiWithFallback,
+  type GroundedPromptContext,
+} from './geminiProtocol';
 
 export interface LiveGeminiCallResult {
   ok: boolean;
@@ -31,14 +23,14 @@ let cachedWorkingModel: string | null = null;
 let cachedKeySig = '';
 let cachedServerProxyStatus: boolean | null = null;
 
-/** Returns the build-time Vite Gemini key if configured, or empty string. */
+/** Returns the build-time Vite Gemini key if configured for local dev, or empty string. */
 export function getClientEnvGeminiKey(): string {
   return (import.meta.env?.VITE_GEMINI_API_KEY ?? '').trim();
 }
 
-/** Returns true when either a session key or build-time env key is present. */
+/** Returns true when either a session key or local env key is present. */
 export function hasClientGeminiKey(sessionApiKey?: string): boolean {
-  const effective = (sessionApiKey?.trim() || getClientEnvGeminiKey());
+  const effective = sessionApiKey?.trim() || getClientEnvGeminiKey();
   return effective.length >= 16;
 }
 
@@ -74,24 +66,23 @@ export async function checkServerGeminiProxy(): Promise<boolean> {
   }
 }
 
-/** Resets cached proxy probe status (used by tests). */
+/** Resets cached proxy probe & model state (used by unit tests). */
 export function resetGeminiClientCaches(): void {
   cachedWorkingModel = null;
   cachedKeySig = '';
   cachedServerProxyStatus = null;
 }
 
-/** Calls the same-origin `/api/gemini` proxy when deployed on Vercel. */
-export async function invokeServerGeminiProxy(
-  systemInstruction: string,
+async function invokeServerGeminiProxy(
   prompt: string,
+  context: GroundedPromptContext,
   signal: AbortSignal
 ): Promise<{ ok: boolean; status: number; text?: string; modelUsed?: string; errorMessage?: string }> {
   const res = await fetch('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
-    body: JSON.stringify({ systemInstruction, prompt }),
+    body: JSON.stringify({ prompt, context }),
   });
 
   const contentType = res.headers.get('content-type') || '';
@@ -106,109 +97,22 @@ export async function invokeServerGeminiProxy(
   return { ok: false, status: res.status, errorMessage: data.error };
 }
 
-async function discoverAvailableGeminiModels(
-  apiKey: string,
-  signal: AbortSignal
-): Promise<string[]> {
-  try {
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
-      headers: { 'x-goog-api-key': apiKey },
-      signal,
-    });
-    if (!res.ok) return [];
-
-    const data = (await res.json()) as { models?: GeminiListModelItem[] };
-    const models = Array.isArray(data.models) ? data.models : [];
-
-    return models
-      .filter(
-        (m): m is GeminiListModelItem & { name: string } =>
-          typeof m.name === 'string' &&
-          Array.isArray(m.supportedGenerationMethods) &&
-          m.supportedGenerationMethods.includes('generateContent') &&
-          m.name.toLowerCase().includes('gemini') &&
-          !m.name.toLowerCase().includes('embedding') &&
-          !m.name.toLowerCase().includes('vision-only') &&
-          !m.name.toLowerCase().includes('tts') &&
-          !m.name.toLowerCase().includes('image')
-      )
-      .map((m) => m.name.replace(/^models\//, ''))
-      .sort((a, b) => {
-        const rank = (id: string) => {
-          const low = id.toLowerCase();
-          if (low.includes('2.5-flash') && !low.includes('lite')) return 1;
-          if (low.includes('2.0-flash') && !low.includes('lite')) return 2;
-          if (low.includes('flash')) return 3;
-          if (low.includes('pro')) return 4;
-          return 5;
-        };
-        return rank(a) - rank(b);
-      });
-  } catch {
-    return [];
-  }
-}
-
-async function invokeDirectGeminiModel(
-  apiKey: string,
-  modelId: string,
-  systemInstruction: string,
-  prompt: string,
-  signal: AbortSignal
-): Promise<{ ok: boolean; status: number; text?: string; errorMessage?: string }> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      modelId
-    )}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      signal,
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 750 },
-      }),
-    }
-  );
-
-  if (res.ok) {
-    const data = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    return {
-      ok: true,
-      status: res.status,
-      text: data.candidates?.[0]?.content?.parts?.[0]?.text?.trim(),
-    };
-  }
-
-  let errorMessage: string | undefined;
-  try {
-    const errJson = (await res.json()) as { error?: { message?: string } };
-    errorMessage = errJson.error?.message;
-  } catch {
-    // ignore non-JSON upstream error body
-  }
-  return { ok: false, status: res.status, errorMessage };
-}
-
 /**
- * Executes a live Gemini request via direct client key (if provided) or via
- * the same-origin `/api/gemini` Vercel proxy when no client key is set.
+ * Executes a live Gemini request:
+ * - Prefers user's explicit session key if manually entered in AI Settings
+ * - Otherwise prefers same-origin `/api/gemini` Vercel proxy (zero client key exposure)
+ * - Falls back to local build-time `VITE_GEMINI_API_KEY` if set in local dev
  */
 export async function executeLiveGeminiRequest(
-  systemInstruction: string,
   prompt: string,
+  context: GroundedPromptContext,
   sessionApiKey?: string
 ): Promise<LiveGeminiCallResult> {
-  const directKey = (sessionApiKey?.trim() || getClientEnvGeminiKey());
-  const useServerProxy = directKey.length < 16 && cachedServerProxyStatus === true;
+  const explicitSessionKey = (sessionApiKey ?? '').trim();
+  const useServerProxy = explicitSessionKey.length < 16 && cachedServerProxyStatus === true;
+  const directKey = explicitSessionKey || getClientEnvGeminiKey();
 
-  if (directKey.length < 16 && !useServerProxy) {
+  if (!useServerProxy && directKey.length < 16) {
     return { ok: false };
   }
 
@@ -217,7 +121,7 @@ export async function executeLiveGeminiRequest(
 
   try {
     if (useServerProxy) {
-      const proxyRes = await invokeServerGeminiProxy(systemInstruction, prompt, controller.signal);
+      const proxyRes = await invokeServerGeminiProxy(prompt, context, controller.signal);
       if (proxyRes.ok && proxyRes.text && proxyRes.text.length > 15) {
         return { ok: true, text: proxyRes.text, modelUsed: proxyRes.modelUsed ?? 'gemini-proxy' };
       }
@@ -236,55 +140,24 @@ export async function executeLiveGeminiRequest(
       cachedKeySig = keySig;
     }
 
-    const candidates: string[] = cachedWorkingModel
-      ? [cachedWorkingModel, ...DEFAULT_GEMINI_MODELS.filter((m) => m !== cachedWorkingModel)]
-      : [...DEFAULT_GEMINI_MODELS];
+    const systemInstruction = buildGroundedSystemPrompt(context);
+    const outcome = await callGeminiWithFallback(
+      directKey,
+      systemInstruction,
+      prompt,
+      controller.signal,
+      cachedWorkingModel
+    );
 
-    let lastStatus = 0;
-    let lastErrorMsg = '';
-    let discovered = false;
-
-    for (let i = 0; i < candidates.length; i += 1) {
-      const modelId = candidates[i];
-      const attempt = await invokeDirectGeminiModel(
-        directKey,
-        modelId,
-        systemInstruction,
-        prompt,
-        controller.signal
-      );
-
-      if (attempt.ok && attempt.text && attempt.text.length > 15) {
-        cachedWorkingModel = modelId;
-        return { ok: true, text: attempt.text, modelUsed: modelId };
-      }
-
-      lastStatus = attempt.status;
-      lastErrorMsg = attempt.errorMessage || '';
-
-      if (
-        attempt.status === 401 ||
-        attempt.status === 403 ||
-        (attempt.status === 400 && lastErrorMsg.toLowerCase().includes('api key'))
-      ) {
-        break;
-      }
-
-      if (attempt.status === 404 && !discovered) {
-        discovered = true;
-        const liveModels = await discoverAvailableGeminiModels(directKey, controller.signal);
-        for (const discoveredModel of liveModels) {
-          if (!candidates.includes(discoveredModel)) {
-            candidates.push(discoveredModel);
-          }
-        }
-      }
+    if (outcome.ok && outcome.text && outcome.modelUsed) {
+      cachedWorkingModel = outcome.modelUsed;
+      return { ok: true, text: outcome.text, modelUsed: outcome.modelUsed };
     }
 
-    const safeDetail = lastErrorMsg ? ` (${sanitizeTextInput(lastErrorMsg, 90)})` : '';
+    const safeDetail = outcome.errorMessage ? ` (${outcome.errorMessage.slice(0, 90)})` : '';
     return {
       ok: false,
-      fallbackNotice: `Live Gemini API returned HTTP ${lastStatus || 'error'}${safeDetail} — answered instantly using our built-in science engine.`,
+      fallbackNotice: `Live Gemini API returned HTTP ${outcome.status || 'error'}${safeDetail} — answered instantly using our built-in science engine.`,
     };
   } catch {
     return {

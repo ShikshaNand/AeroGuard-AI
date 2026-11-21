@@ -111,7 +111,7 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = React.memo(({
                 <span className="mt-1 block text-2xl font-extrabold text-danger-warm">
                   {location.pm25}
                 </span>
-                <span className="text-[10px] text-danger-body">µg/m³ PM2.5</span>
+                <span className="text-[11px] text-danger-body">µg/m³ PM2.5</span>
               </div>
 
               <div className="beige-amber hover-lift rounded-xl p-3">
@@ -119,7 +119,7 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = React.memo(({
                 <span className="mt-1 block text-2xl font-extrabold text-warn-deep">
                   {iaqSim.baselineIndoorPm25}
                 </span>
-                <span className="text-[10px] text-warn-body">
+                <span className="text-[11px] text-warn-body">
                   {iaqSim.infiltrationContributionUg} leak + {iaqSim.indoorCombustionContributionUg} indoor
                 </span>
               </div>
@@ -131,7 +131,7 @@ export const IndoorAirHacks: React.FC<IndoorAirHacksProps> = React.memo(({
                 <span className="mt-1 block text-2xl font-extrabold text-brand-deep">
                   {iaqSim.optimizedIndoorPm25}
                 </span>
-                <span className="text-[10px] text-brand-ink font-bold">
+                <span className="text-[11px] text-brand-ink font-bold">
                   -{iaqSim.reductionPct}% (-{iaqSim.reductionUgPerM3} µg/m³)
                 </span>
               </div>

@@ -1,4 +1,5 @@
 /// <reference types="vitest" />
+import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -16,8 +17,27 @@ const devFastRefreshCspPlugin: Plugin = {
   },
 };
 
+/**
+ * Exposes raw `src/index.css` source to Vitest contrast-ratio tests without
+ * triggering Tailwind CSS compilation (never imported by production app code).
+ */
+const rawThemeCssVirtualPlugin: Plugin = {
+  name: 'raw-theme-css-virtual',
+  resolveId(id) {
+    if (id === 'virtual:theme-css') return '\0virtual:theme-css';
+    return null;
+  },
+  load(id) {
+    if (id === '\0virtual:theme-css') {
+      const css = readFileSync(new URL('./src/index.css', import.meta.url), 'utf8');
+      return `export default ${JSON.stringify(css)};`;
+    }
+    return null;
+  },
+};
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), devFastRefreshCspPlugin],
+  plugins: [react(), tailwindcss(), devFastRefreshCspPlugin, rawThemeCssVirtualPlugin],
   build: {
     rollupOptions: {
       output: {
@@ -36,7 +56,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['src/**/*.{ts,tsx}'],
+      include: ['src/**/*.{ts,tsx}', 'api/**/*.ts'],
       exclude: [
         'src/__tests__/**',
         'src/types/**',

@@ -29,7 +29,7 @@ export const MemberCounterCard: React.FC<MemberCounterCardProps> = React.memo(
             <label htmlFor={id} className="block text-xs font-bold text-ink truncate">
               {label}
             </label>
-            <span className="block text-[10px] text-ink-subtle truncate">{sublabel}</span>
+            <span className="block text-[11px] text-ink-subtle truncate">{sublabel}</span>
           </div>
         </div>
 

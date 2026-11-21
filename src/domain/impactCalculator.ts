@@ -54,16 +54,21 @@ export function generateTailoredDailyRoutines(
     Math.min(85, ventAnalysis.pm25ReductionPctByTiming || 52)
   );
 
-  // Commute emission math based on dailyCommuteKm and cold-start winter penalty
+  // Commute emission math calibrated to dailyCommuteKm + cold-start ambient temperature penalty
+  // Sub-10°C winter starts extend catalytic warm-up time and raise primary PM2.5/NOx up to 1.4x
   const commuteKm = Math.max(2, profile.dailyCommuteKm);
+  const coldStartTempMultiplier =
+    location.temperatureC <= 0 ? 1.4 : location.temperatureC <= 10 ? 1.2 : 1.0;
   const isHighEmissionCommute =
     profile.commuteMode === 'car_solo_ice' || profile.commuteMode === 'carpool_shared';
   const commuteCo2Saved = isHighEmissionCommute
-    ? Number((commuteKm * 0.19).toFixed(2))
+    ? Number((commuteKm * 0.19 * (0.9 + 0.1 * coldStartTempMultiplier)).toFixed(2))
     : Number((commuteKm * 0.06).toFixed(2));
   const commutePmNoxSaved = isHighEmissionCommute
-    ? Number((commuteKm * 0.85).toFixed(1))
+    ? Number((commuteKm * 0.85 * coldStartTempMultiplier).toFixed(1))
     : Number((commuteKm * 0.25).toFixed(1));
+  const coldErrandPmNoxSaved = Number((6.4 * coldStartTempMultiplier).toFixed(1));
+  const coldErrandDoseSaved = Math.max(18, Math.round(location.pm25 * 0.12));
 
   const vulnerableTag = profile.hasInfantsOrChildren
     ? 'Protects Developing Lungs (Kids)'
@@ -176,9 +181,9 @@ export function generateTailoredDailyRoutines(
       recommendedActivity:
         'Chain errands immediately onto the end of a warm-engine trip or walk during the 14:30 low-smog window',
       isAdopted: adoptedIds.has('routine-cold-start-batching'),
-      personalPm25DoseSavedUg: 22,
+      personalPm25DoseSavedUg: coldErrandDoseSaved,
       exposureReductionPct: 45,
-      localPollutantsSavedGrams: 6.4,
+      localPollutantsSavedGrams: coldErrandPmNoxSaved,
       co2eSavedKg: 1.35,
       directImpactExplanation:
         'A three-way catalytic converter is virtually inactive below 300°C. In winter, three separate 3 km trips with a cold engine emit more tailpipe PM2.5, carbon monoxide, and unburned hydrocarbons than a single 40 km highway drive with a warm engine.',

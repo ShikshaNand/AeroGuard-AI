@@ -29,6 +29,7 @@ interface AiSmogAssistantProps {
   cadrSizing: CADRSizingResult;
   impactSummary: AggregateImpactSummary;
   sessionApiKey: string;
+  isGeminiLiveAvailable?: boolean;
   onOpenFamilySettings?: () => void;
 }
 
@@ -67,8 +68,10 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
   cadrSizing,
   impactSummary,
   sessionApiKey,
+  isGeminiLiveAvailable = false,
   onOpenFamilySettings,
 }) => {
+  const isLiveReady = Boolean(sessionApiKey.trim()) || isGeminiLiveAvailable;
   const ventWindow = useMemo(
     () => findOptimalVentilationWindows(location.hourlyForecast),
     [location.hourlyForecast]
@@ -100,7 +103,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
       role: 'user',
       content: promptText.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      sourceMode: sessionApiKey ? 'gemini-live' : 'expert-engine',
+      sourceMode: isLiveReady ? 'gemini-live' : 'expert-engine',
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -202,7 +205,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
           </span>
         </div>
         <span className="rounded-full bg-sage-pill border border-sage-line px-2.5 py-0.5 text-[11px] font-bold text-brand-ink">
-          {sessionApiKey ? 'Gemini Live + Science Guard' : 'Built-in Science Engine Ready'}
+          {isLiveReady ? 'Gemini Live + Science Guard' : 'Built-in Science Engine Ready'}
         </span>
       </div>
 

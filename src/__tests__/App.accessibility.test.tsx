@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import axe from 'axe-core';
 import { App } from '../App';
+import * as geminiApiClient from '../services/geminiApiClient';
 
 describe('AeroGuard AI Application Integration, Member Controls & AI Coach', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.spyOn(geminiApiClient, 'checkServerGeminiProxy').mockImplementation(
+      () => new Promise<boolean>(() => {})
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
   it('renders semantic HTML5 landmarks, skip-to-content link, and plain-English air status hero', () => {
     render(<App />);
@@ -78,6 +87,17 @@ describe('AeroGuard AI Application Integration, Member Controls & AI Coach', () 
     expect(screen.queryByText(/Slide 2 of 5/i)).not.toBeInTheDocument();
   });
 
+  it('passes automated axe-core WCAG 2.1 accessibility checks with zero violations', async () => {
+    const { container } = render(<App />);
+    const results = await axe.run(container, {
+      rules: {
+        // JSDOM does not compute CSS background images/colors accurately for color-contrast
+        'color-contrast': { enabled: false },
+      },
+    });
+    expect(results.violations).toEqual([]);
+  });
+
   it('reflects updated member counts live inside the AI Coach and responds to custom typed questions', async () => {
     render(<App />);
 
@@ -86,11 +106,13 @@ describe('AeroGuard AI Application Integration, Member Controls & AI Coach', () 
     fireEvent.click(incKids);
     fireEvent.click(incKids);
 
-    // Switch to Ask AeroGuard AI tab
+    // Switch to Ask AeroGuard AI tab (code-split lazy chunk)
     fireEvent.click(screen.getByRole('tab', { name: /Ask AeroGuard AI/i }));
 
     // Live context strip and dynamic welcome message both reflect updated 3 Kids immediately
-    expect(screen.getAllByText(/3 Kids/i).length).toBeGreaterThanOrEqual(2);
+    await waitFor(() => {
+      expect(screen.getAllByText(/3 Kids/i).length).toBeGreaterThanOrEqual(2);
+    });
 
     // Ask a custom typed question about kids & masks
     const promptInput = screen.getByLabelText(/Ask a question about winter smog/i);

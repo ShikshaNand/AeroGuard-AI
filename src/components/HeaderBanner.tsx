@@ -29,6 +29,7 @@ interface HeaderBannerProps {
   theme: ThemeMode;
   onToggleTheme: () => void;
   sessionApiKey: string;
+  isEnvOrProxyConnected: boolean;
   onSaveSessionApiKey: (key: string) => void;
 }
 
@@ -41,6 +42,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   theme,
   onToggleTheme,
   sessionApiKey,
+  isEnvOrProxyConnected,
   onSaveSessionApiKey,
 }) => {
   const [cityMenuOpen, setCityMenuOpen] = useState(false);
@@ -342,7 +344,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             >
               <KeyRound className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
               <span className="hidden lg:inline">
-                {sessionApiKey ? 'Gemini Connected' : 'AI Settings'}
+                {sessionApiKey || isEnvOrProxyConnected ? 'Gemini Connected' : 'AI Settings'}
               </span>
             </button>
           </div>
@@ -352,6 +354,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         {showKeyModal && (
           <ApiKeyDrawer
             sessionApiKey={sessionApiKey}
+            isEnvOrProxyConnected={isEnvOrProxyConnected}
             keyInputDraft={keyInputDraft}
             keyError={keyError}
             onChangeDraft={setKeyInputDraft}

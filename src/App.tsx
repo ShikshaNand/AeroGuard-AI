@@ -1,11 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  Clock,
-  Home,
-  Leaf,
-  Bot,
-  ShieldAlert,
-} from 'lucide-react';
+import { lazy, Suspense, useState, useMemo, useEffect, useCallback } from 'react';
+import { Clock, Home, Leaf, Bot } from 'lucide-react';
 import type { FamilyProfile, LocationAirQuality } from './types';
 import {
   IAQ_HACKS_CATALOGUE,
@@ -34,16 +28,30 @@ import {
   adjustMemberCount as applyMemberDelta,
   type MemberCountField,
 } from './domain/familyMembers';
+import {
+  checkServerGeminiProxy,
+  hasClientGeminiKey,
+} from './services/geminiApiClient';
 import { useToggleSet } from './hooks/useToggleSet';
 import { useDebouncedPersistState } from './hooks/usePersistedAppState';
 import { HeaderBanner } from './components/HeaderBanner';
 import { SidebarNav, type SidebarTabDefinition } from './components/SidebarNav';
 import { AirStatusHero } from './components/AirStatusHero';
+import { CompactContextBar } from './components/CompactContextBar';
+import { AppFooter } from './components/AppFooter';
 import { FamilyProfileBar } from './components/FamilyProfileBar';
 import { RoutinePlanner } from './components/RoutinePlanner';
-import { IndoorAirHacks } from './components/IndoorAirHacks';
-import { SustainableSwaps } from './components/SustainableSwaps';
-import { AiSmogAssistant } from './components/AiSmogAssistant';
+
+// Code-split secondary module tabs for faster initial First Contentful Paint
+const IndoorAirHacks = lazy(() =>
+  import('./components/IndoorAirHacks').then((m) => ({ default: m.IndoorAirHacks }))
+);
+const SustainableSwaps = lazy(() =>
+  import('./components/SustainableSwaps').then((m) => ({ default: m.SustainableSwaps }))
+);
+const AiSmogAssistant = lazy(() =>
+  import('./components/AiSmogAssistant').then((m) => ({ default: m.AiSmogAssistant }))
+);
 
 type ActiveTabId = PersistedTabId;
 
@@ -55,10 +63,10 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTabId>(initialState.activeTab);
   const [showFamilyDrawer, setShowFamilyDrawer] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(initialState.theme);
-  // SECURITY: API key is kept strictly in volatile RAM and never persisted to localStorage
+  // SECURITY: Optional user-entered API key stays strictly in volatile RAM
   const [sessionApiKey, setSessionApiKey] = useState('');
+  const [hasServerGeminiProxy, setHasServerGeminiProxy] = useState(false);
 
-  // Adopted Low-Emission Daily Routines, Indoor Air Hacks & Sustainable Swaps (via shared hook)
   const [adoptedRoutineIds, handleToggleRoutine, setAdoptedRoutineIds] = useToggleSet(
     initialState.adoptedRoutineIds
   );
@@ -73,6 +81,22 @@ export function App() {
   const [communityHouseholdsCount, setCommunityHouseholdsCount] = useState(
     initialState.communityHouseholdsCount
   );
+
+  // Probe same-origin Vercel /api/gemini serverless proxy once on mount
+  useEffect(() => {
+    let active = true;
+    void checkServerGeminiProxy().then((configured) => {
+      if (active) {
+        setHasServerGeminiProxy(configured);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const isEnvOrProxyConnected = hasClientGeminiKey() || hasServerGeminiProxy;
+  const isGeminiLiveAvailable = hasClientGeminiKey(sessionApiKey) || hasServerGeminiProxy;
 
   const persistedSnapshot = useMemo(
     () => ({
@@ -101,7 +125,11 @@ export function App() {
 
   useDebouncedPersistState(persistedSnapshot);
 
-  const handleResetDefaults = () => {
+  useEffect(() => {
+    document.body.classList.toggle('dark-theme', theme === 'dark');
+  }, [theme]);
+
+  const handleResetDefaults = useCallback(() => {
     clearPersistedState();
     const defaults = getDefaultPersistedState();
     setProfile(defaults.profile);
@@ -113,17 +141,8 @@ export function App() {
     setCommunityHouseholdsCount(defaults.communityHouseholdsCount);
     setTheme(defaults.theme);
     setActiveTab(defaults.activeTab);
-  };
+  }, [setAdoptedRoutineIds, setActiveHackIds, setSelectedSwapIds]);
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.body.classList.add('dark-theme');
-    } else {
-      document.body.classList.remove('dark-theme');
-    }
-  }, [theme]);
-
-  // Quick member adjustment helper for sidebar + family drawer
   const adjustMemberCount = useCallback((field: MemberCountField, delta: number) => {
     setProfile((prev) => applyMemberDelta(prev, field, delta));
   }, []);
@@ -136,20 +155,24 @@ export function App() {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
-  // Memoized Domain Computations
   const routines = useMemo(
     () => generateTailoredDailyRoutines(location, profile, adoptedRoutineIds),
     [location, profile, adoptedRoutineIds]
   );
 
-  const activeHacksList = useMemo(
+  const activeHacks = useMemo(
     () => IAQ_HACKS_CATALOGUE.filter((h) => activeHackIds.has(h.id)),
     [activeHackIds]
   );
 
+  const selectedSwaps = useMemo(
+    () => SUSTAINABLE_ALTERNATIVES_CATALOGUE.filter((s) => selectedSwapIds.has(s.id)),
+    [selectedSwapIds]
+  );
+
   const iaqSim = useMemo(
-    () => simulateIndoorAirQuality(location.pm25, profile, activeHacksList),
-    [location.pm25, profile, activeHacksList]
+    () => simulateIndoorAirQuality(location.pm25, profile, activeHacks),
+    [location.pm25, profile, activeHacks]
   );
 
   const cadrSizing = useMemo(
@@ -163,28 +186,18 @@ export function App() {
     [profile.mainRoomAreaSqM, profile.ceilingHeightM, location.pm25, targetAch]
   );
 
-  const selectedSwapsList = useMemo(
-    () =>
-      SUSTAINABLE_ALTERNATIVES_CATALOGUE.filter((s) => selectedSwapIds.has(s.id)),
-    [selectedSwapIds]
-  );
-
   const impactSummary = useMemo(
     () =>
       calculateAggregateImpact(
         routines,
-        selectedSwapsList,
+        selectedSwaps,
         communityHouseholdsCount,
         profile.householdSize
       ),
-    [routines, selectedSwapsList, communityHouseholdsCount, profile.householdSize]
+    [routines, selectedSwaps, communityHouseholdsCount, profile.householdSize]
   );
 
-  const severity = useMemo(
-    () => getAQISeverityMetadata(location.usAqi),
-    [location.usAqi]
-  );
-
+  const severity = useMemo(() => getAQISeverityMetadata(location.usAqi), [location.usAqi]);
   const ventWindow = useMemo(
     () => findOptimalVentilationWindows(location.hourlyForecast),
     [location.hourlyForecast]
@@ -226,7 +239,6 @@ export function App() {
 
   return (
     <div className="app-shell min-h-screen flex flex-col bg-canvas text-ink">
-      {/* Minimal Single-Row Top Bar */}
       <HeaderBanner
         location={location}
         onSelectLocation={setLocation}
@@ -236,12 +248,11 @@ export function App() {
         theme={theme}
         onToggleTheme={handleToggleTheme}
         sessionApiKey={sessionApiKey}
+        isEnvOrProxyConnected={isEnvOrProxyConnected}
         onSaveSessionApiKey={setSessionApiKey}
       />
 
-      {/* Full-Width Modern Edge-to-Edge App Shell (Zero Wasted Side Space) */}
       <div className="flex w-full flex-1 flex-col lg:flex-row">
-        {/* Pinned Warm-Sand Left Sidebar Rail */}
         <SidebarNav
           tabs={tabs}
           activeTab={activeTab}
@@ -251,13 +262,8 @@ export function App() {
           onToggleFamilyDrawer={handleToggleFamilyDrawer}
         />
 
-        {/* Full-Width Spacious Main Content Area */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <main
-            id="main-content"
-            className="w-full flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-10"
-          >
-            {/* Collapsible Full Family & Home Panel */}
+          <main id="main-content" className="w-full flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-10">
             {showFamilyDrawer && (
               <FamilyProfileBar
                 profile={profile}
@@ -267,32 +273,18 @@ export function App() {
               />
             )}
 
-            {/* Animated Page Container (Smoothly Staggers Containers on Every Tab Change!) */}
             <div key={activeTab} className="stagger-children space-y-6">
-              {/* Show Full Serene Hero on Overview Tab, or Compact 1-Line Context Bar on Other Tabs */}
               {activeTab === 'routines' ? (
                 <AirStatusHero location={location} iaqSim={iaqSim} />
               ) : (
-                <div className="beige-panel flex flex-wrap items-center justify-between gap-2 rounded-2xl px-5 py-3 text-xs">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-extrabold text-ink">
-                      {location.city}, {location.country}
-                    </span>
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${severity.badgeClasses}`}
-                    >
-                      AQI {location.usAqi} · {severity.symbolCode}
-                    </span>
-                  </div>
-                  <span className="text-ink-secondary">
-                    Best outdoor window:{' '}
-                    <strong className="text-brand-ink">{ventWindow.bestWindowLabel}</strong> · Indoor air:{' '}
-                    <strong className="text-brand-ink">{iaqSim.optimizedIndoorPm25} µg/m³</strong>
-                  </span>
-                </div>
+                <CompactContextBar
+                  location={location}
+                  severity={severity}
+                  bestVentWindow={ventWindow.bestWindowLabel}
+                  optimizedIndoorPm25={iaqSim.optimizedIndoorPm25}
+                />
               )}
 
-              {/* Active Module Tabpanel */}
               <div
                 id={`panel-${activeTab}`}
                 role="tabpanel"
@@ -308,63 +300,62 @@ export function App() {
                   />
                 )}
 
-                {activeTab === 'iaq-hacks' && (
-                  <IndoorAirHacks
-                    location={location}
-                    profile={profile}
-                    onUpdateProfile={setProfile}
-                    allHacks={IAQ_HACKS_CATALOGUE}
-                    activeHackIds={activeHackIds}
-                    onToggleHack={handleToggleHack}
-                    iaqSim={iaqSim}
-                    cadrSizing={cadrSizing}
-                    targetAch={targetAch}
-                    onChangeTargetAch={setTargetAch}
-                  />
-                )}
+                <Suspense
+                  fallback={
+                    <div
+                      role="status"
+                      className="beige-panel rounded-3xl p-8 text-center text-xs font-semibold text-ink-muted"
+                    >
+                      Loading module...
+                    </div>
+                  }
+                >
+                  {activeTab === 'iaq-hacks' && (
+                    <IndoorAirHacks
+                      location={location}
+                      profile={profile}
+                      onUpdateProfile={setProfile}
+                      allHacks={IAQ_HACKS_CATALOGUE}
+                      activeHackIds={activeHackIds}
+                      onToggleHack={handleToggleHack}
+                      iaqSim={iaqSim}
+                      cadrSizing={cadrSizing}
+                      targetAch={targetAch}
+                      onChangeTargetAch={setTargetAch}
+                    />
+                  )}
 
-                {activeTab === 'sustainable-swaps' && (
-                  <SustainableSwaps
-                    location={location}
-                    profile={profile}
-                    allSwaps={SUSTAINABLE_ALTERNATIVES_CATALOGUE}
-                    selectedSwapIds={selectedSwapIds}
-                    onToggleSwap={handleToggleSwap}
-                    communityHouseholdsCount={communityHouseholdsCount}
-                    onChangeCommunityHouseholdsCount={setCommunityHouseholdsCount}
-                    impactSummary={impactSummary}
-                  />
-                )}
+                  {activeTab === 'sustainable-swaps' && (
+                    <SustainableSwaps
+                      location={location}
+                      profile={profile}
+                      allSwaps={SUSTAINABLE_ALTERNATIVES_CATALOGUE}
+                      selectedSwapIds={selectedSwapIds}
+                      onToggleSwap={handleToggleSwap}
+                      communityHouseholdsCount={communityHouseholdsCount}
+                      onChangeCommunityHouseholdsCount={setCommunityHouseholdsCount}
+                      impactSummary={impactSummary}
+                    />
+                  )}
 
-                {activeTab === 'ai-assistant' && (
-                  <AiSmogAssistant
-                    location={location}
-                    profile={profile}
-                    iaqSim={iaqSim}
-                    cadrSizing={cadrSizing}
-                    impactSummary={impactSummary}
-                    sessionApiKey={sessionApiKey}
-                    onOpenFamilySettings={() => setShowFamilyDrawer(true)}
-                  />
-                )}
+                  {activeTab === 'ai-assistant' && (
+                    <AiSmogAssistant
+                      location={location}
+                      profile={profile}
+                      iaqSim={iaqSim}
+                      cadrSizing={cadrSizing}
+                      impactSummary={impactSummary}
+                      sessionApiKey={sessionApiKey}
+                      isGeminiLiveAvailable={isGeminiLiveAvailable}
+                      onOpenFamilySettings={() => setShowFamilyDrawer(true)}
+                    />
+                  )}
+                </Suspense>
               </div>
             </div>
           </main>
 
-          {/* Full-Width Minimal Clean Footer */}
-          <footer className="mt-auto border-t border-line bg-surface-soft px-4 py-4 sm:px-6 lg:px-10 text-xs text-ink-subtle">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="flex items-center gap-1.5">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-warn-ink" aria-hidden="true" />
-                <span>
-                  Based on WHO air guidelines (≤15 µg/m³ PM2.5), ASHRAE room filtration, and Berkeley Earth exposure equivalents. Consult a doctor for breathing emergencies.
-                </span>
-              </p>
-              <p className="shrink-0 font-semibold text-ink-secondary">
-                AeroGuard AI
-              </p>
-            </div>
-          </footer>
+          <AppFooter />
         </div>
       </div>
     </div>

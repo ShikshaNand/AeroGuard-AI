@@ -4,7 +4,7 @@
  * with TTL caching, AbortController timeouts, in-flight deduplication, and offline fallback.
  */
 
-import type { HourlyPollutantPoint, LocationAirQuality } from '../types';
+import type { HourlyPollutantPoint, LocationAirQuality, StagnationOutlook } from '../types';
 import { pm25ToUsAqi } from '../domain/airQualityEngine';
 import { buildHourlyWinterCurve, WINTER_SMOG_CITY_PRESETS } from '../data/smogPresets';
 import { TTLCache } from '../utils/cache';
@@ -171,6 +171,55 @@ function buildHourlyForecastPoints(
   }));
 }
 
+function computeThreeDayStagnationOutlook(
+  aqData: OpenMeteoAirQualityResponse,
+  fallbackPm25: number,
+  windSpeedKmh: number
+): StagnationOutlook {
+  const pmSeries = (aqData.hourly?.pm2_5 ?? []).filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v)
+  );
+  if (pmSeries.length < 48) {
+    const trend = windSpeedKmh >= 12 ? 'Clearing' : windSpeedKmh <= 6 ? 'Persisting' : 'Rising';
+    return {
+      trend,
+      threeDayAvgPm25: Math.round(fallbackPm25),
+      summary:
+        trend === 'Clearing'
+          ? `Surface winds (${windSpeedKmh} km/h) should gradually disperse stagnant winter haze over the next 72 hours.`
+          : `Calm winter boundary layer (${windSpeedKmh} km/h) indicates smog is ${trend.toLowerCase()} over the next 72 hours — keep bedroom filtration active.`,
+    };
+  }
+
+  const day1Avg = pmSeries.slice(0, 24).reduce((s, v) => s + v, 0) / 24;
+  const day3Slice = pmSeries.slice(48, 72);
+  const day3Avg = day3Slice.reduce((s, v) => s + v, 0) / Math.max(1, day3Slice.length);
+  const threeDayAvgPm25 = Math.round(
+    pmSeries.slice(0, 72).reduce((s, v) => s + v, 0) / Math.min(72, pmSeries.length)
+  );
+
+  const deltaPct = ((day3Avg - day1Avg) / Math.max(1, day1Avg)) * 100;
+  if (deltaPct <= -15) {
+    return {
+      trend: 'Clearing',
+      threeDayAvgPm25,
+      summary: `72h outlook shows PM2.5 easing by ~${Math.round(Math.abs(deltaPct))}% (3-day avg ${threeDayAvgPm25} µg/m³) as atmospheric mixing improves.`,
+    };
+  }
+  if (deltaPct >= 15) {
+    return {
+      trend: 'Rising',
+      threeDayAvgPm25,
+      summary: `72h stagnation alert: PM2.5 is projected to climb ~${Math.round(deltaPct)}% (3-day avg ${threeDayAvgPm25} µg/m³) — stock N95s and verify filter seals.`,
+    };
+  }
+  return {
+    trend: 'Persisting',
+    threeDayAvgPm25,
+    summary: `Multi-day thermal lid persisting (3-day avg ${threeDayAvgPm25} µg/m³) — maintain afternoon pulse ventilation and overnight room filtration.`,
+  };
+}
+
 function parseOpenMeteoTelemetry(
   meta: { city: string; country: string; latitude: number; longitude: number; cacheKey: string },
   aqData: OpenMeteoAirQualityResponse,
@@ -217,6 +266,7 @@ function parseOpenMeteoTelemetry(
       tempC: temperatureC,
       windKmh: windSpeedKmh,
     }),
+    stagnationOutlook: computeThreeDayStagnationOutlook(aqData, pm25, windSpeedKmh),
   };
 }
 
@@ -278,8 +328,8 @@ export async function fetchLiveAirQualityForCoords(
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi&hourly=pm10,pm2_5,nitrogen_dioxide,us_aqi&forecast_days=1`;
-      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,wind_speed_10m&forecast_days=1`;
+      const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi&hourly=pm10,pm2_5,nitrogen_dioxide,us_aqi&forecast_days=3`;
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,wind_speed_10m&forecast_days=3`;
 
       const [aqRes, weatherRes] = await Promise.all([
         fetch(aqUrl, { signal: controller.signal }),

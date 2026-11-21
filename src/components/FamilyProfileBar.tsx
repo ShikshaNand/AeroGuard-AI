@@ -12,15 +12,15 @@ import {
   User,
   RotateCcw,
 } from 'lucide-react';
-import type {
-  CommuteMode,
-  CookingFuelType,
-  FamilyProfile,
-  HeatingFuelType,
-  HomeSealingLevel,
-} from '../types';
+import type { FamilyProfile } from '../types';
 import { sanitizeTextInput } from '../utils/security';
 import { applyMemberCounts, type MemberCountField } from '../domain/familyMembers';
+import {
+  isCommuteMode,
+  isCookingFuelType,
+  isHeatingFuelType,
+  isHomeSealingLevel,
+} from '../domain/profileGuards';
 import { MemberCounterCard } from './MemberCounterCard';
 
 interface FamilyProfileBarProps {
@@ -180,12 +180,11 @@ export const FamilyProfileBar: React.FC<FamilyProfileBarProps> = ({
           <select
             id="commute-mode-select"
             value={profile.commuteMode}
-            onChange={(e) =>
-              onUpdateProfile({
-                ...profile,
-                commuteMode: e.target.value as CommuteMode,
-              })
-            }
+            onChange={(e) => {
+              if (isCommuteMode(e.target.value)) {
+                onUpdateProfile({ ...profile, commuteMode: e.target.value });
+              }
+            }}
             className="w-full rounded-xl border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink font-medium"
           >
             <option value="car_solo_ice">Solo Petrol/Diesel Car</option>
@@ -229,12 +228,11 @@ export const FamilyProfileBar: React.FC<FamilyProfileBarProps> = ({
           <select
             id="heating-type-select"
             value={profile.heatingType}
-            onChange={(e) =>
-              onUpdateProfile({
-                ...profile,
-                heatingType: e.target.value as HeatingFuelType,
-              })
-            }
+            onChange={(e) => {
+              if (isHeatingFuelType(e.target.value)) {
+                onUpdateProfile({ ...profile, heatingType: e.target.value });
+              }
+            }}
             className="w-full rounded-xl border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink font-medium"
           >
             <option value="wood_coal_biomass">Wood / Coal Stove</option>
@@ -259,12 +257,11 @@ export const FamilyProfileBar: React.FC<FamilyProfileBarProps> = ({
           <select
             id="cooking-type-select"
             value={profile.cookingType}
-            onChange={(e) =>
-              onUpdateProfile({
-                ...profile,
-                cookingType: e.target.value as CookingFuelType,
-              })
-            }
+            onChange={(e) => {
+              if (isCookingFuelType(e.target.value)) {
+                onUpdateProfile({ ...profile, cookingType: e.target.value });
+              }
+            }}
             className="w-full rounded-xl border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink font-medium"
           >
             <option value="lpg_gas_unvented">Gas Stove (No Chimney)</option>
@@ -288,12 +285,11 @@ export const FamilyProfileBar: React.FC<FamilyProfileBarProps> = ({
           <select
             id="home-sealing-select"
             value={profile.homeSealing}
-            onChange={(e) =>
-              onUpdateProfile({
-                ...profile,
-                homeSealing: e.target.value as HomeSealingLevel,
-              })
-            }
+            onChange={(e) => {
+              if (isHomeSealingLevel(e.target.value)) {
+                onUpdateProfile({ ...profile, homeSealing: e.target.value });
+              }
+            }}
             className="w-full rounded-xl border border-line-strong bg-surface px-2.5 py-2 text-xs text-ink font-medium"
           >
             <option value="leaky_drafty">Older / Drafty Windows</option>

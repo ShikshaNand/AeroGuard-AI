@@ -176,10 +176,10 @@ export const AirStatusHero: React.FC<AirStatusHeroProps> = React.memo(({
           <div className="beige-sand rounded-xl p-3">
             <span className="text-ink-secondary font-semibold flex items-center gap-1">
               <Wind className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
-              Why Smog Is High Here
+              72-Hour Smog Outlook ({location.stagnationOutlook?.trend ?? (location.windSpeedKmh < 7 ? 'Persisting' : 'Clearing')})
             </span>
             <p className="mt-1 text-[11px] text-ink-body leading-relaxed">
-              {location.dominantSmogSource}
+              {location.stagnationOutlook?.summary ?? location.dominantSmogSource}
             </p>
           </div>
         </div>

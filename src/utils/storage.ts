@@ -9,11 +9,19 @@
 
 import type { FamilyProfile, HourlyPollutantPoint, LocationAirQuality } from '../types';
 import { DEFAULT_FAMILY_PROFILE, WINTER_SMOG_CITY_PRESETS } from '../data/smogPresets';
+import {
+  isCommuteMode,
+  isCookingFuelType,
+  isHeatingFuelType,
+  isHomeSealingLevel,
+  isPersistedTabId,
+  type PersistedTabId,
+} from '../domain/profileGuards';
 import { sanitizeTextInput, validateCoordinates } from './security';
 
+export type { PersistedTabId };
 export const STORAGE_KEY = 'aeroguard_user_state_v1';
 
-export type PersistedTabId = 'routines' | 'iaq-hacks' | 'sustainable-swaps' | 'ai-assistant';
 export type ThemeMode = 'light' | 'dark';
 
 export interface PersistedAppState {
@@ -26,44 +34,6 @@ export interface PersistedAppState {
   communityHouseholdsCount: number;
   theme: ThemeMode;
   activeTab: PersistedTabId;
-}
-
-const VALID_TABS = new Set<PersistedTabId>([
-  'routines',
-  'iaq-hacks',
-  'sustainable-swaps',
-  'ai-assistant',
-]);
-
-const VALID_COMMUTE = new Set<FamilyProfile['commuteMode']>([
-  'car_solo_ice',
-  'carpool_shared',
-  'public_transit_metro',
-  'electric_vehicle',
-  'active_walk_cycle',
-]);
-
-const VALID_HEATING = new Set<FamilyProfile['heatingType']>([
-  'wood_coal_biomass',
-  'gas_furnace',
-  'electric_resistance',
-  'heat_pump_clean',
-]);
-
-const VALID_COOKING = new Set<FamilyProfile['cookingType']>([
-  'lpg_gas_unvented',
-  'gas_with_chimney_hood',
-  'induction_electric',
-]);
-
-const VALID_SEALING = new Set<FamilyProfile['homeSealing']>([
-  'leaky_drafty',
-  'standard_masonry',
-  'tight_weatherstripped',
-]);
-
-function isInSet<T extends string>(set: ReadonlySet<T>, value: unknown): value is T {
-  return typeof value === 'string' && set.has(value as T);
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
@@ -115,14 +85,14 @@ function validateProfile(raw: unknown): FamilyProfile {
     hasAsthmaOrRespiratory: respiratoryCareCount > 0,
     hasPregnantMember: Boolean(obj.hasPregnantMember),
     hasPets: petsCount > 0,
-    commuteMode: isInSet(VALID_COMMUTE, obj.commuteMode)
+    commuteMode: isCommuteMode(obj.commuteMode)
       ? obj.commuteMode
       : DEFAULT_FAMILY_PROFILE.commuteMode,
     dailyCommuteKm: clampInt(obj.dailyCommuteKm, 2, 60, DEFAULT_FAMILY_PROFILE.dailyCommuteKm),
-    heatingType: isInSet(VALID_HEATING, obj.heatingType)
+    heatingType: isHeatingFuelType(obj.heatingType)
       ? obj.heatingType
       : DEFAULT_FAMILY_PROFILE.heatingType,
-    cookingType: isInSet(VALID_COOKING, obj.cookingType)
+    cookingType: isCookingFuelType(obj.cookingType)
       ? obj.cookingType
       : DEFAULT_FAMILY_PROFILE.cookingType,
     mainRoomAreaSqM: clampInt(obj.mainRoomAreaSqM, 10, 90, DEFAULT_FAMILY_PROFILE.mainRoomAreaSqM),
@@ -132,7 +102,7 @@ function validateProfile(raw: unknown): FamilyProfile {
       obj.ceilingHeightM <= 5.0
         ? obj.ceilingHeightM
         : DEFAULT_FAMILY_PROFILE.ceilingHeightM,
-    homeSealing: isInSet(VALID_SEALING, obj.homeSealing)
+    homeSealing: isHomeSealingLevel(obj.homeSealing)
       ? obj.homeSealing
       : DEFAULT_FAMILY_PROFILE.homeSealing,
     indoorRelativeHumidityPct: clampInt(
@@ -293,7 +263,7 @@ export function loadPersistedState(): PersistedAppState {
         defaults.communityHouseholdsCount
       ),
       theme: parsed.theme === 'dark' ? 'dark' : 'light',
-      activeTab: isInSet(VALID_TABS, parsed.activeTab) ? parsed.activeTab : defaults.activeTab,
+      activeTab: isPersistedTabId(parsed.activeTab) ? parsed.activeTab : defaults.activeTab,
     };
   } catch {
     return defaults;

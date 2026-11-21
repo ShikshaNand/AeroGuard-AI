@@ -84,6 +84,7 @@ describe('openMeteoService telemetry & resilience', () => {
 
     expect(a.isLiveApi).toBe(true);
     expect(a.pm25).toBe(88);
+    expect(a.stagnationOutlook).toBeDefined();
     expect(b).toEqual(a);
     // Only 1 pair of (air-quality + weather) requests should have fired despite 2 concurrent calls
     expect(fetchCalls).toBe(2);

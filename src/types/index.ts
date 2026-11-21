@@ -37,6 +37,14 @@ export interface HourlyPollutantPoint {
   isInversionTrap: boolean;
 }
 
+export type StagnationTrend = 'Rising' | 'Persisting' | 'Clearing';
+
+export interface StagnationOutlook {
+  trend: StagnationTrend;
+  threeDayAvgPm25: number;
+  summary: string;
+}
+
 export interface LocationAirQuality {
   id: string;
   city: string;
@@ -69,6 +77,8 @@ export interface LocationAirQuality {
   dominantSmogSource: string;
   /** 24-hour pollutant and inversion curve */
   hourlyForecast: HourlyPollutantPoint[];
+  /** Optional 3-day winter smog stagnation trend outlook */
+  stagnationOutlook?: StagnationOutlook;
 }
 
 export type CommuteMode =

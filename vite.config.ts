@@ -1,10 +1,23 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+/**
+ * Allows Vite's React Fast Refresh inline preamble during local `npm run dev`
+ * while keeping the strict `script-src 'self'` CSP untouched in `index.html`
+ * and production builds (`dist/index.html`).
+ */
+const devFastRefreshCspPlugin: Plugin = {
+  name: 'dev-fast-refresh-csp',
+  apply: 'serve',
+  transformIndexHtml(html) {
+    return html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';");
+  },
+};
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), devFastRefreshCspPlugin],
   build: {
     rollupOptions: {
       output: {

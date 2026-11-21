@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { readFileSync } from 'node:fs';
+import { env as nodeEnv } from 'node:process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -38,6 +39,11 @@ const rawThemeCssVirtualPlugin: Plugin = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), devFastRefreshCspPlugin, rawThemeCssVirtualPlugin],
+  // On Vercel deployments, keep VITE_GEMINI_API_KEY strictly server-side inside /api/gemini
+  // so it is never bundled into public client JavaScript even without renaming the env var.
+  define: nodeEnv.VERCEL
+    ? { 'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify('') }
+    : undefined,
   build: {
     rollupOptions: {
       output: {

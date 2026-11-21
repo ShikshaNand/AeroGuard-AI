@@ -10,9 +10,9 @@ const PERSIST_DEBOUNCE_MS = 150;
  */
 export function useDebouncedPersistState(state: PersistedAppState): void {
   const latestRef = useRef(state);
-  latestRef.current = state;
 
   useEffect(() => {
+    latestRef.current = state;
     const timer = setTimeout(() => {
       savePersistedState(latestRef.current);
     }, PERSIST_DEBOUNCE_MS);
@@ -28,15 +28,5 @@ export function useDebouncedPersistState(state: PersistedAppState): void {
       clearTimeout(timer);
       savePersistedState(latestRef.current);
     };
-  }, [
-    state.profile,
-    state.location,
-    state.adoptedRoutineIds,
-    state.activeHackIds,
-    state.selectedSwapIds,
-    state.targetAch,
-    state.communityHouseholdsCount,
-    state.theme,
-    state.activeTab,
-  ]);
+  }, [state]);
 }

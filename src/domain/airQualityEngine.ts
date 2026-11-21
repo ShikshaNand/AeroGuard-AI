@@ -20,8 +20,8 @@ export interface AQISeverityMetadata {
   tier: AQISeverityTier;
   /** Accessible non-color symbol prefix for colorblind & screen-reader clarity */
   symbolCode: string;
+  /** Semantic CSS class mapped to theme-aware AQI badge custom properties */
   badgeClasses: string;
-  progressBarColor: string;
   shortGuidance: string;
   sensitiveGroupWarning: string;
 }
@@ -62,8 +62,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
     return {
       tier: 'Good',
       symbolCode: '✓ GOOD',
-      badgeClasses: 'bg-[#E3F2E8] text-[#1B4D35] border-[#9CCAB0]',
-      progressBarColor: 'bg-[#2D6A4F]',
+      badgeClasses: 'aqi-badge-good',
       shortGuidance: 'Ideal conditions for outdoor family activities and full home cross-ventilation.',
       sensitiveGroupWarning: 'Safe for infants, elderly, and asthma/COPD members.',
     };
@@ -73,8 +72,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
     return {
       tier: 'Moderate',
       symbolCode: '◐ MOD',
-      badgeClasses: 'bg-[#FEF3D6] text-[#7A4B00] border-[#E5BF73]',
-      progressBarColor: 'bg-[#C4831D]',
+      badgeClasses: 'aqi-badge-moderate',
       shortGuidance: 'Acceptable air quality; ventilate during afternoon breeze hours.',
       sensitiveGroupWarning:
         'Unusually sensitive children or asthma patients should reduce prolonged heavy exertion near busy roads.',
@@ -85,8 +83,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
     return {
       tier: 'Unhealthy for Sensitive Groups',
       symbolCode: '▲ USG',
-      badgeClasses: 'bg-[#FDE8D7] text-[#8E3A08] border-[#E5A77B]',
-      progressBarColor: 'bg-[#D96B27]',
+      badgeClasses: 'aqi-badge-usg',
       shortGuidance: 'Winter smog accumulation detected. Shift heavy exercise indoors or to mid-afternoon.',
       sensitiveGroupWarning:
         'Children, elderly (65+), pregnant women, and asthma patients should wear N95/KN95 masks during morning commute.',
@@ -97,8 +94,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
     return {
       tier: 'Unhealthy',
       symbolCode: '◆ UNHEALTHY',
-      badgeClasses: 'bg-[#FCE4E1] text-[#8F1D1D] border-[#E49A93]',
-      progressBarColor: 'bg-[#C43C35]',
+      badgeClasses: 'aqi-badge-unhealthy',
       shortGuidance:
         'Active winter smog trap. Keep windows sealed during morning/evening peaks and run indoor HEPA or DIY MERV-13 filtration.',
       sensitiveGroupWarning:
@@ -110,8 +106,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
     return {
       tier: 'Very Unhealthy',
       symbolCode: '✖ VERY UNHEALTHY',
-      badgeClasses: 'bg-[#F3E5F5] text-[#5B1E66] border-[#CAA2D1]',
-      progressBarColor: 'bg-[#7E2F8E]',
+      badgeClasses: 'aqi-badge-very-unhealthy',
       shortGuidance:
         'Severe winter thermal inversion trap. Cancel outdoor runs/sports, seal window drafts, and restrict ventilation to a 15-min afternoon pulse.',
       sensitiveGroupWarning:
@@ -122,8 +117,7 @@ export function getAQISeverityMetadata(usAqi: number): AQISeverityMetadata {
   return {
     tier: 'Severe / Hazardous',
     symbolCode: '☣ HAZARDOUS',
-    badgeClasses: 'bg-[#7F1D1D] text-[#FFFDF8] border-[#5C1212] ring-1 ring-[#B91C1C]/40',
-    progressBarColor: 'bg-[#991B1B]',
+    badgeClasses: 'aqi-badge-hazardous',
     shortGuidance:
       'Emergency winter smog crisis. Create a clean-air sanctuary room indoors, wet-mop floors, and eliminate all indoor combustion.',
     sensitiveGroupWarning:

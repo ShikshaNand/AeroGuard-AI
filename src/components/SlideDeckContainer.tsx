@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, LayoutGrid, Presentation } from 'lucide-react';
 
 interface SlideDeckContainerProps<T> {
@@ -33,15 +33,9 @@ export function SlideDeckContainer<T>({
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
-  useEffect(() => {
-    if (activeIndex >= items.length && items.length > 0) {
-      setActiveIndex(0);
-    }
-  }, [items.length, activeIndex]);
-
   if (items.length === 0) {
     return (
-      <div className="beige-panel hc-card rounded-3xl p-6 text-center text-sm text-[#5C5246]">
+      <div className="beige-panel rounded-3xl p-6 text-center text-sm text-ink-muted">
         No items match this filter.
       </div>
     );
@@ -81,14 +75,14 @@ export function SlideDeckContainer<T>({
     <section
       aria-label={title}
       onKeyDown={handleDeckKeyDown}
-      className="beige-panel hc-card rounded-3xl p-5 sm:p-6 space-y-5 overflow-hidden"
+      className="beige-panel rounded-3xl p-5 sm:p-6 space-y-5 overflow-hidden"
     >
       {/* Clean Header Row */}
-      <div className="flex flex-col gap-3 border-b border-[#ECE2D0] pb-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 border-b border-line-subtle pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="text-base font-extrabold text-[#231D17] sm:text-lg">{title}</h3>
+          <h3 className="text-base font-extrabold text-ink sm:text-lg">{title}</h3>
           {subtitle && (
-            <p className="mt-0.5 text-xs text-[#6A5E50] sm:text-sm">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-ink-subtle sm:text-sm">{subtitle}</p>
           )}
         </div>
 
@@ -96,7 +90,7 @@ export function SlideDeckContainer<T>({
           {headerRightExtra}
 
           <div
-            className="inline-flex rounded-xl bg-[#F1EADC] p-1 border border-[#E1D5C1]"
+            className="inline-flex rounded-xl bg-chip p-1 border border-line"
             role="group"
             aria-label="Layout view mode"
           >
@@ -106,8 +100,8 @@ export function SlideDeckContainer<T>({
               aria-pressed={viewMode === 'slides'}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 viewMode === 'slides'
-                  ? 'bg-[#2D6A4F] text-[#FFFDF8] shadow-xs'
-                  : 'text-[#4E4439] hover:text-[#231D17]'
+                  ? 'bg-brand text-on-brand shadow-xs'
+                  : 'text-ink-secondary hover:text-ink'
               }`}
             >
               <Presentation className="h-3.5 w-3.5" aria-hidden="true" />
@@ -119,8 +113,8 @@ export function SlideDeckContainer<T>({
               aria-pressed={viewMode === 'all'}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 viewMode === 'all'
-                  ? 'bg-[#2D6A4F] text-[#FFFDF8] shadow-xs'
-                  : 'text-[#4E4439] hover:text-[#231D17]'
+                  ? 'bg-brand text-on-brand shadow-xs'
+                  : 'text-ink-secondary hover:text-ink'
               }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
@@ -135,7 +129,7 @@ export function SlideDeckContainer<T>({
           {/* Clean, Uncluttered Slide Controls & Progress Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="rounded-full bg-[#F1EADC] border border-[#E1D5C1] px-3 py-1 text-xs font-extrabold text-[#231D17]">
+              <span className="rounded-full bg-chip border border-line px-3 py-1 text-xs font-extrabold text-ink">
                 Slide {safeIndex + 1} of {items.length}
               </span>
               <div
@@ -144,11 +138,11 @@ export function SlideDeckContainer<T>({
                 aria-valuenow={safeIndex + 1}
                 aria-valuemin={1}
                 aria-valuemax={items.length}
-                className="hidden sm:block w-36 h-2 rounded-full bg-[#EBE2D3] overflow-hidden"
+                className="hidden sm:block w-36 h-2 rounded-full bg-track overflow-hidden"
               >
                 <div
                   style={{ width: `${progressPct}%` }}
-                  className="h-full rounded-full bg-[#2D6A4F] transition-all duration-300 ease-out"
+                  className="h-full rounded-full bg-brand transition-all duration-300 ease-out"
                 />
               </div>
             </div>
@@ -158,7 +152,7 @@ export function SlideDeckContainer<T>({
                 type="button"
                 onClick={handlePrev}
                 aria-label="Previous slide"
-                className="inline-flex items-center gap-1 rounded-xl border border-[#DDD0BC] bg-[#FAF6EE] px-3.5 py-2 text-xs font-bold text-[#231D17] hover:bg-[#EAE0CE] active:scale-95 transition"
+                className="inline-flex items-center gap-1 rounded-xl border border-line-strong bg-surface-soft px-3.5 py-2 text-xs font-bold text-ink hover:bg-chip-hover active:scale-95 transition"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 <span>Previous</span>
@@ -167,7 +161,7 @@ export function SlideDeckContainer<T>({
                 type="button"
                 onClick={handleNext}
                 aria-label="Next slide"
-                className="inline-flex items-center gap-1 rounded-xl bg-[#2D6A4F] px-3.5 py-2 text-xs font-bold text-[#FFFDF8] hover:bg-[#1B4D35] active:scale-95 transition shadow-xs"
+                className="inline-flex items-center gap-1 rounded-xl bg-brand px-3.5 py-2 text-xs font-bold text-on-brand hover:bg-brand-hover active:scale-95 transition shadow-xs"
               >
                 <span>Next</span>
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -195,8 +189,8 @@ export function SlideDeckContainer<T>({
                 onClick={() => handleJumpTo(idx)}
                 className={`h-2.5 rounded-full transition-all duration-300 ${
                   idx === safeIndex
-                    ? 'w-9 bg-[#2D6A4F]'
-                    : 'w-2.5 bg-[#D8CBB6] hover:bg-[#A6947A]'
+                    ? 'w-9 bg-brand'
+                    : 'w-2.5 bg-dot hover:bg-dot-hover'
                 }`}
               />
             ))}

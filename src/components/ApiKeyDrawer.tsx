@@ -33,20 +33,20 @@ export const ApiKeyDrawer: React.FC<ApiKeyDrawerProps> = React.memo(
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <p className="font-bold text-[#1B4D35] flex items-center gap-1.5">
+          <p className="font-bold text-brand-ink flex items-center gap-1.5">
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             Optional: Connect Live Google Gemini AI
           </p>
-          <p className="text-[#3A4A40]">
+          <p className="text-ink-secondary">
             The assistant already works right away using our built-in science engine. If you have a Gemini API key, paste it here (kept only in memory for this session).
           </p>
           {sessionApiKey && (
-            <p className="text-[#1B4D35] font-semibold">
+            <p className="text-brand-ink font-semibold">
               Active session key: <code>{maskApiKey(sessionApiKey)}</code>
             </p>
           )}
           {keyError && (
-            <p role="alert" className="font-semibold text-[#8F1D1D]">
+            <p role="alert" className="font-semibold text-danger-ink">
               {keyError}
             </p>
           )}
@@ -62,11 +62,11 @@ export const ApiKeyDrawer: React.FC<ApiKeyDrawerProps> = React.memo(
             value={keyInputDraft}
             onChange={(e) => onChangeDraft(e.target.value)}
             placeholder="Paste Gemini API key..."
-            className="rounded-lg border border-[#BDD8C5] bg-[#FFFDF8] px-3 py-1.5 text-xs text-[#2B241D]"
+            className="rounded-lg border border-sage-line bg-surface px-3 py-1.5 text-xs text-ink"
           />
           <button
             type="submit"
-            className="inline-flex items-center gap-1 rounded-lg bg-[#2D6A4F] px-3 py-1.5 font-semibold text-[#FFFDF8] hover:bg-[#1B4D35]"
+            className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 font-semibold text-on-brand hover:bg-brand-hover"
           >
             <Check className="h-3.5 w-3.5" aria-hidden="true" />
             Save
@@ -75,7 +75,7 @@ export const ApiKeyDrawer: React.FC<ApiKeyDrawerProps> = React.memo(
             <button
               type="button"
               onClick={onClearKey}
-              className="rounded-lg border border-[#D89A8E] bg-[#FDF1EC] px-2.5 py-1.5 text-[#8F1D1D] font-semibold hover:bg-[#F9DFD7]"
+              className="rounded-lg border border-danger-line bg-terracotta-soft px-2.5 py-1.5 text-danger-ink font-semibold hover:bg-terracotta-soft"
             >
               Clear
             </button>
@@ -84,7 +84,7 @@ export const ApiKeyDrawer: React.FC<ApiKeyDrawerProps> = React.memo(
             type="button"
             onClick={onClose}
             aria-label="Close AI settings panel"
-            className="rounded-lg p-1.5 text-[#5C5246] hover:text-[#231D17]"
+            className="rounded-lg p-1.5 text-ink-muted hover:text-ink"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

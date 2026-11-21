@@ -62,6 +62,10 @@ const VALID_SEALING = new Set<FamilyProfile['homeSealing']>([
   'tight_weatherstripped',
 ]);
 
+function isInSet<T extends string>(set: ReadonlySet<T>, value: unknown): value is T {
+  return typeof value === 'string' && set.has(value as T);
+}
+
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback;
@@ -111,15 +115,15 @@ function validateProfile(raw: unknown): FamilyProfile {
     hasAsthmaOrRespiratory: respiratoryCareCount > 0,
     hasPregnantMember: Boolean(obj.hasPregnantMember),
     hasPets: petsCount > 0,
-    commuteMode: VALID_COMMUTE.has(obj.commuteMode as FamilyProfile['commuteMode'])
-      ? (obj.commuteMode as FamilyProfile['commuteMode'])
+    commuteMode: isInSet(VALID_COMMUTE, obj.commuteMode)
+      ? obj.commuteMode
       : DEFAULT_FAMILY_PROFILE.commuteMode,
     dailyCommuteKm: clampInt(obj.dailyCommuteKm, 2, 60, DEFAULT_FAMILY_PROFILE.dailyCommuteKm),
-    heatingType: VALID_HEATING.has(obj.heatingType as FamilyProfile['heatingType'])
-      ? (obj.heatingType as FamilyProfile['heatingType'])
+    heatingType: isInSet(VALID_HEATING, obj.heatingType)
+      ? obj.heatingType
       : DEFAULT_FAMILY_PROFILE.heatingType,
-    cookingType: VALID_COOKING.has(obj.cookingType as FamilyProfile['cookingType'])
-      ? (obj.cookingType as FamilyProfile['cookingType'])
+    cookingType: isInSet(VALID_COOKING, obj.cookingType)
+      ? obj.cookingType
       : DEFAULT_FAMILY_PROFILE.cookingType,
     mainRoomAreaSqM: clampInt(obj.mainRoomAreaSqM, 10, 90, DEFAULT_FAMILY_PROFILE.mainRoomAreaSqM),
     ceilingHeightM:
@@ -128,8 +132,8 @@ function validateProfile(raw: unknown): FamilyProfile {
       obj.ceilingHeightM <= 5.0
         ? obj.ceilingHeightM
         : DEFAULT_FAMILY_PROFILE.ceilingHeightM,
-    homeSealing: VALID_SEALING.has(obj.homeSealing as FamilyProfile['homeSealing'])
-      ? (obj.homeSealing as FamilyProfile['homeSealing'])
+    homeSealing: isInSet(VALID_SEALING, obj.homeSealing)
+      ? obj.homeSealing
       : DEFAULT_FAMILY_PROFILE.homeSealing,
     indoorRelativeHumidityPct: clampInt(
       obj.indoorRelativeHumidityPct,
@@ -289,9 +293,7 @@ export function loadPersistedState(): PersistedAppState {
         defaults.communityHouseholdsCount
       ),
       theme: parsed.theme === 'dark' ? 'dark' : 'light',
-      activeTab: VALID_TABS.has(parsed.activeTab as PersistedTabId)
-        ? (parsed.activeTab as PersistedTabId)
-        : defaults.activeTab,
+      activeTab: isInSet(VALID_TABS, parsed.activeTab) ? parsed.activeTab : defaults.activeTab,
     };
   } catch {
     return defaults;

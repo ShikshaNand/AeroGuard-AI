@@ -24,12 +24,12 @@ AeroGuard AI is a GenAI-powered web application that helps families and communit
 
 ## Engineering Highlights Across Evaluation Pillars
 
-- **Code Quality**: Strict TypeScript (`strict: true`), modular layered architecture (`src/domain/`, `src/services/`, `src/components/`, `src/utils/`, `src/data/`), pure mathematical domain calculators, and zero `any` types.
-- **Security**: Strict Content Security Policy (CSP) in `index.html`, comprehensive input sanitization (`sanitizeTextInput`), prompt-injection guardrails (`validatePromptSafety`), sliding-window rate limiter, secure `x-goog-api-key` header transmission with masking (`maskApiKey`), and XSS-free React rendering (no `dangerouslySetInnerHTML`).
-- **Efficiency**: Bounded in-memory `TTLCache` with LRU eviction for geocoding, AQI telemetry, and AI responses; request deduplication for in-flight telemetry; debounced city search; `AbortController` network timeouts; and memoized domain computations.
-- **Testing**: Comprehensive automated unit, domain, security, and component integration test suite powered by **Vitest + React Testing Library** (14 test suites, 44 tests, 100% passing).
-- **Accessibility (WCAG 2.1 AA)**: Warm beige editorial palette with >10:1 espresso text contrast, Light Beige / Warm Espresso Dark Theme toggle, skip-to-main-content link, semantic HTML5 landmarks, keyboard-navigable ARIA tabs, directional animated slide decks, and non-color-dependent AQI badges.
-- **Problem Statement Alignment**: Directly addresses severe winter smog and urban air pollution with actionable habit shifts, mass-balance IAQ physics, DIY air filtration (Corsi-Rosenthal box), and community-level collective impact modeling.
+- **Code Quality**: Strict TypeScript (`strict: true`, zero `any`, zero `as unknown as`), ESLint 9 + TypeScript-ESLint + React Hooks flat config (`npm run lint`), Prettier config, Tailwind v4 `@theme inline` semantic design tokens (zero arbitrary hex overrides, zero `!important`), clean modular layered architecture (`src/domain/`, `src/services/`, `src/hooks/`, `src/components/`, `src/utils/`, `src/data/`), and GitHub Actions CI (`.github/workflows/ci.yml`).
+- **Security**: Hardened Content Security Policy (`script-src 'self'`, zero `'unsafe-inline'` scripts) in `index.html`, zero `npm audit` dependency vulnerabilities, iterative XSS input sanitization (`sanitizeTextInput`), prompt-injection guardrails (`validatePromptSafety`), API key format validation (`validateGeminiApiKeyFormat`), sliding-window rate limiter, RAM-only `x-goog-api-key` header transmission with masking (`maskApiKey`), schema-validated storage recovery, and XSS-free native React rendering (`SafeMarkdownText`, zero `dangerouslySetInnerHTML`).
+- **Efficiency**: Bounded $O(1)$ in-memory `TTLCache` with LRU eviction for geocoding, AQI telemetry, and AI responses; in-flight request deduplication; debounced city search & debounced `localStorage` persistence with unload flush; `AbortController` network timeouts; Vite vendor chunk splitting (`vendor-react`, `vendor-icons`); and `React.memo` + `useMemo` / `useCallback` optimizations.
+- **Testing**: Comprehensive automated unit, domain, hook, service, security, and component integration test suite powered by **Vitest 5 + React Testing Library** (16 test suites, 47 tests, 100% passing).
+- **Accessibility (WCAG 2.1 AA)**: Semantic Warm Beige Light & Midnight Espresso Dark themes powered by CSS custom properties (>10:1 espresso text contrast), skip-to-main-content link, semantic HTML5 landmarks, full WAI-ARIA Tabs keyboard focus management (`Arrow`/`Home`/`End`), trigger focus restoration on `Escape`, keyboard-inspectable 24-hour forecast bars, `role="progressbar"` slide decks, `prefers-reduced-motion` support, and non-color-dependent AQI badges.
+- **Problem Statement Alignment**: Directly addresses severe winter thermal-inversion smog and urban air pollution with actionable habit shifts, mass-balance IAQ physics, Winter Indoor Humidity Guard alerts, DIY Corsi-Rosenthal box economics, and community-level collective impact modeling.
 
 ## Quick Start
 
@@ -41,6 +41,7 @@ npm run dev
 ## Verification Commands
 
 ```bash
+npm run lint
 npm run typecheck
 npm run test
 npm run build

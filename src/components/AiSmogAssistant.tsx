@@ -143,18 +143,18 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
   };
 
   return (
-    <div className="beige-panel hc-card rounded-3xl p-5 sm:p-6 space-y-4">
+    <div className="beige-panel rounded-3xl p-5 sm:p-6 space-y-4">
       {/* Clean Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ECE2D0] pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-subtle pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#2D6A4F] text-[#FFFDF8]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand text-on-brand">
             <Bot className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-[#231D17]">
+            <h2 className="text-lg font-extrabold text-ink">
               Ask AeroGuard AI
             </h2>
-            <p className="text-xs text-[#6A5E50]">
+            <p className="text-xs text-ink-subtle">
               Personalized clean-air answers using your live city air &amp; exact family member counts
             </p>
           </div>
@@ -165,9 +165,9 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
             <button
               type="button"
               onClick={onOpenFamilySettings}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD0BC] bg-[#FAF6EE] px-3 py-1.5 text-xs font-bold text-[#2B241D] hover:bg-[#EFE7D9]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface-soft px-3 py-1.5 text-xs font-bold text-ink hover:bg-chip"
             >
-              <Users className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
+              <Users className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
               <span>Edit Members ({profile.householdSize})</span>
             </button>
           )}
@@ -175,7 +175,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
             <button
               type="button"
               onClick={() => setMessages([])}
-              className="inline-flex items-center gap-1 rounded-xl border border-[#DDD0BC] bg-[#FFFDF8] px-3 py-1.5 text-xs font-semibold text-[#5C5246] hover:bg-[#EFE7D9]"
+              className="inline-flex items-center gap-1 rounded-xl border border-line-strong bg-surface px-3 py-1.5 text-xs font-semibold text-ink-muted hover:bg-chip"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Clear</span>
@@ -185,7 +185,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
       </div>
 
       {/* Live Synced Context Strip (Always stays up to date when city or member counts change!) */}
-      <div className="beige-inset rounded-2xl px-4 py-3 text-xs text-[#3B3228] flex flex-wrap items-center justify-between gap-2">
+      <div className="beige-inset rounded-2xl px-4 py-3 text-xs text-ink-body flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>
             <strong>City:</strong> {location.city} (AQI {location.usAqi}, {whoMultiple}× safe limit)
@@ -201,7 +201,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
             <strong>Safe Window:</strong> {ventWindow.bestWindowLabel}
           </span>
         </div>
-        <span className="rounded-full bg-[#E6F1EA] border border-[#BDD8C5] px-2.5 py-0.5 text-[11px] font-bold text-[#1B4D35]">
+        <span className="rounded-full bg-sage-pill border border-sage-line px-2.5 py-0.5 text-[11px] font-bold text-brand-ink">
           {sessionApiKey ? 'Gemini Live + Science Guard' : 'Built-in Science Engine Ready'}
         </span>
       </div>
@@ -214,9 +214,9 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
             type="button"
             disabled={isGenerating}
             onClick={() => void handleSendPrompt(item.prompt)}
-            className="hover-lift rounded-full border border-[#BDD8C5] bg-[#FAFDFB] px-3.5 py-1.5 text-xs font-semibold text-[#1B4D35] hover:bg-[#E6F1EA] hover:border-[#2D6A4F] active:scale-95 transition disabled:opacity-50"
+            className="hover-lift rounded-full border border-sage-line bg-surface-active px-3.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-sage-pill hover:border-brand active:scale-95 transition disabled:opacity-50"
           >
-            <Sparkles className="mr-1.5 inline h-3 w-3 text-[#2D6A4F]" aria-hidden="true" />
+            <Sparkles className="mr-1.5 inline h-3 w-3 text-brand-ink" aria-hidden="true" />
             {item.label}
           </button>
         ))}
@@ -233,16 +233,16 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
         {/* Dynamic Always-Fresh Welcome Message */}
         <div className="animate-chat-enter flex gap-3 justify-start">
           <div
-            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#2D6A4F] text-[#FFFDF8]"
+            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand"
             aria-hidden="true"
           >
             <Bot className="h-4 w-4" />
           </div>
-          <div className="max-w-3xl rounded-2xl border border-[#E2D6C2] bg-[#FFFDF8] p-4 space-y-2 shadow-xs">
-            <p className="text-sm font-extrabold text-[#1B4D35]">
+          <div className="max-w-3xl rounded-2xl border border-line bg-surface p-4 space-y-2 shadow-xs">
+            <p className="text-sm font-extrabold text-brand-ink">
               Hi {profile.familyName}! How can I help your home breathe easier today?
             </p>
-            <p className="text-xs text-[#3B3228] leading-relaxed">
+            <p className="text-xs text-ink-body leading-relaxed">
               I’m tracking <strong>{location.city}</strong> (AQI <strong>{location.usAqi}</strong>, safest outdoor window <strong>{ventWindow.bestWindowLabel}</strong>) for your household of <strong>{profile.householdSize}</strong> ({profile.adultsCount} adults, {profile.childrenCount} kids, {profile.seniorsCount} seniors{profile.petsCount > 0 ? `, ${profile.petsCount} pets` : ''}). Tap any button above or type your own question below!
             </p>
           </div>
@@ -257,7 +257,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
           >
             {msg.role === 'assistant' && (
               <div
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#2D6A4F] text-[#FFFDF8]"
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand"
                 aria-hidden="true"
               >
                 <Bot className="h-4 w-4" />
@@ -267,8 +267,8 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
             <div
               className={`max-w-3xl rounded-2xl p-4 shadow-xs ${
                 msg.role === 'user'
-                  ? 'bg-[#2B241D] text-[#FFFDF8] font-medium text-xs'
-                  : 'border border-[#E2D6C2] bg-[#FFFDF8] space-y-2'
+                  ? 'bg-dark-pill text-on-brand font-medium text-xs'
+                  : 'border border-line bg-surface space-y-2'
               }`}
             >
               {msg.role === 'user' ? (
@@ -276,18 +276,18 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
               ) : (
                 <>
                   {msg.fallbackNotice && (
-                    <div className="beige-amber rounded-lg px-2.5 py-1.5 text-[11px] text-[#7A4B00] flex items-center gap-1.5">
+                    <div className="beige-amber rounded-lg px-2.5 py-1.5 text-[11px] text-warn-ink flex items-center gap-1.5">
                       <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       <span>{msg.fallbackNotice}</span>
                     </div>
                   )}
 
                   {msg.keyMetricsCited && msg.keyMetricsCited.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 border-b border-[#ECE2D0] pb-2">
+                    <div className="flex flex-wrap gap-1.5 border-b border-line-subtle pb-2">
                       {msg.keyMetricsCited.map((metric, i) => (
                         <span
                           key={i}
-                          className="rounded-md bg-[#F6F0E4] px-2 py-0.5 text-[10px] font-semibold text-[#1B4D35] border border-[#E5DAC8]"
+                          className="rounded-md bg-chip px-2 py-0.5 text-[10px] font-semibold text-brand-ink border border-line"
                         >
                           {metric}
                         </span>
@@ -295,9 +295,9 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
                     </div>
                   )}
                   <SafeMarkdownText content={msg.content} />
-                  <div className="flex items-center justify-between border-t border-[#ECE2D0] pt-2 text-[10px] text-[#6A5E50]">
+                  <div className="flex items-center justify-between border-t border-line-subtle pt-2 text-[10px] text-ink-subtle">
                     <span className="flex items-center gap-1 font-medium">
-                      <ShieldCheck className="h-3 w-3 text-[#2D6A4F]" aria-hidden="true" />
+                      <ShieldCheck className="h-3 w-3 text-brand-ink" aria-hidden="true" />
                       {msg.sourceMode === 'gemini-live'
                         ? `Google Gemini (${msg.modelUsed ?? 'Live'})`
                         : 'AeroGuard Environmental Science Engine'}
@@ -310,7 +310,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
 
             {msg.role === 'user' && (
               <div
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#E5D9C5] text-[#2B241D]"
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-chip text-ink"
                 aria-hidden="true"
               >
                 <User className="h-4 w-4" />
@@ -320,7 +320,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
         ))}
 
         {isGenerating && (
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#1B4D35] animate-pulse">
+          <div className="flex items-center gap-2 text-xs font-semibold text-brand-ink animate-pulse">
             <Bot className="h-4 w-4" aria-hidden="true" />
             <span>Preparing personalized advice for {profile.familyName}...</span>
           </div>
@@ -339,12 +339,12 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
           value={inputDraft}
           onChange={(e) => setInputDraft(e.target.value)}
           placeholder={`Ask anything about ${location.city} smog, your ${profile.householdSize} family members, or indoor air...`}
-          className="flex-1 rounded-xl border border-[#D8CBB6] bg-[#FAF6EE] px-4 py-3 text-xs text-[#2B241D] placeholder-[#8A7D6D] focus:border-[#2D6A4F] focus:bg-[#FFFDF8]"
+          className="flex-1 rounded-xl border border-line-strong bg-surface-soft px-4 py-3 text-xs text-ink placeholder-ink-subtle focus:border-brand focus:bg-surface"
         />
         <button
           type="submit"
           disabled={isGenerating || inputDraft.trim().length === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-5 py-3 text-xs font-bold text-[#FFFDF8] hover:bg-[#1B4D35] transition disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-xs font-bold text-on-brand hover:bg-brand-hover transition disabled:opacity-50"
         >
           <Send className="h-4 w-4" aria-hidden="true" />
           <span>Send</span>

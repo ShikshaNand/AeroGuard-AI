@@ -86,26 +86,36 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
     };
   }, [cityMenuOpen, showKeyModal]);
 
+  const trimmedSearchQuery = sanitizeTextInput(searchQuery, 60);
+
   // Debounced geocoding city search
   useEffect(() => {
-    const trimmed = sanitizeTextInput(searchQuery, 60);
-    if (trimmed.length < 2) {
-      setSearchResults([]);
+    if (trimmedSearchQuery.length < 2) {
       return;
     }
 
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const results = await searchCities(trimmed);
-        setSearchResults(results);
+        const results = await searchCities(trimmedSearchQuery);
+        if (!cancelled) {
+          setSearchResults(results);
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) {
+          setIsSearching(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [trimmedSearchQuery]);
+
+  const visibleSearchResults = trimmedSearchQuery.length >= 2 ? searchResults : [];
 
   const handlePickGeoResult = async (geo: GeocodingResult) => {
     setIsLoadingCity(true);
@@ -145,11 +155,11 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#E5DAC8] bg-[#FAF6EE]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-line bg-header backdrop-blur-md">
       {/* WCAG 2.1 AA Skip Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[#2D6A4F] focus:px-4 focus:py-2 focus:font-bold focus:text-[#FFFDF8]"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:font-bold focus:text-on-brand"
       >
         Skip to main content
       </a>
@@ -159,16 +169,16 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           {/* Left: Clean Brand Identity */}
           <div className="flex items-center gap-3">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2D6A4F] text-[#FFFDF8] shadow-sm"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand shadow-sm"
               aria-hidden="true"
             >
               <Wind className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-extrabold tracking-tight text-[#231D17] leading-tight">
+              <h1 className="text-lg font-extrabold tracking-tight text-ink leading-tight">
                 AeroGuard AI
               </h1>
-              <p className="text-xs text-[#6A5E50] hidden sm:block">
+              <p className="text-xs text-ink-subtle hidden sm:block">
                 Family Clean-Air &amp; Winter Smog Guide
               </p>
             </div>
@@ -182,19 +192,19 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               onClick={() => setCityMenuOpen((prev) => !prev)}
               aria-expanded={cityMenuOpen}
               aria-label="Change city or search location"
-              className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#DDD0BC] bg-[#FFFDF8] px-3.5 py-2 text-left text-xs shadow-xs hover:border-[#2D6A4F] transition"
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-line-strong bg-surface px-3.5 py-2 text-left text-xs shadow-xs hover:border-brand transition"
             >
               <span className="flex items-center gap-2 truncate">
-                <MapPin className="h-4 w-4 shrink-0 text-[#2D6A4F]" aria-hidden="true" />
-                <span className="font-bold text-[#231D17] truncate">
+                <MapPin className="h-4 w-4 shrink-0 text-brand-ink" aria-hidden="true" />
+                <span className="font-bold text-ink truncate">
                   {location.city}, {location.country}
                 </span>
-                <span className="rounded-full bg-[#EFE7D9] px-2 py-0.5 text-[10px] font-semibold text-[#5C5246] shrink-0">
+                <span className="rounded-full bg-chip px-2 py-0.5 text-[10px] font-semibold text-ink-muted shrink-0">
                   {isLoadingCity ? 'Updating...' : location.isLiveApi ? 'Live' : 'Preset'}
                 </span>
               </span>
               <ChevronDown
-                className={`h-4 w-4 shrink-0 text-[#6A5E50] transition-transform ${
+                className={`h-4 w-4 shrink-0 text-ink-subtle transition-transform ${
                   cityMenuOpen ? 'rotate-180' : ''
                 }`}
                 aria-hidden="true"
@@ -205,12 +215,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             {cityMenuOpen && (
               <div className="beige-panel animate-drawer-enter absolute left-0 right-0 top-full z-40 mt-2 rounded-2xl p-3 shadow-xl space-y-3">
                 <div>
-                  <label htmlFor="city-search-input" className="block text-[11px] font-bold text-[#5C5246] mb-1.5">
+                  <label htmlFor="city-search-input" className="block text-[11px] font-bold text-ink-muted mb-1.5">
                     Search any city worldwide (Live Air Quality)
                   </label>
                   <div className="relative">
                     <Search
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7A6E60]"
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle"
                       aria-hidden="true"
                     />
                     <input
@@ -220,31 +230,31 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Type city name (e.g. Delhi, London, Milan)..."
-                      className="w-full rounded-xl border border-[#D8CBB6] bg-[#FAF6EE] py-2 pl-9 pr-3 text-xs text-[#2B241D] placeholder-[#8A7D6D] focus:border-[#2D6A4F] focus:bg-[#FFFDF8]"
+                      className="w-full rounded-xl border border-line-strong bg-surface-soft py-2 pl-9 pr-3 text-xs text-ink placeholder-ink-subtle focus:border-brand focus:bg-surface"
                     />
                   </div>
 
-                  {(searchResults.length > 0 || isSearching) && (
+                  {(visibleSearchResults.length > 0 || isSearching) && (
                     <div
                       role="listbox"
                       aria-label="City search suggestions"
-                      className="mt-1.5 rounded-xl border border-[#E5DAC8] bg-[#FFFDF8] p-1"
+                      className="mt-1.5 rounded-xl border border-line bg-surface p-1"
                     >
                       {isSearching ? (
-                        <p className="px-3 py-2 text-xs text-[#6A5E50]">Searching cities...</p>
+                        <p className="px-3 py-2 text-xs text-ink-subtle">Searching cities...</p>
                       ) : (
-                        searchResults.map((geo) => (
+                        visibleSearchResults.map((geo) => (
                           <button
                             key={geo.id}
                             type="button"
                             onClick={() => handlePickGeoResult(geo)}
-                            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs text-[#2B241D] hover:bg-[#EFE7D9]"
+                            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs text-ink hover:bg-chip"
                           >
                             <span className="font-semibold">
                               {geo.name}
                               {geo.admin1 ? `, ${geo.admin1}` : ''}
                             </span>
-                            <span className="text-[#6A5E50]">{geo.country}</span>
+                            <span className="text-ink-subtle">{geo.country}</span>
                           </button>
                         ))
                       )}
@@ -252,8 +262,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   )}
                 </div>
 
-                <div className="border-t border-[#ECE2D0] pt-2.5">
-                  <span className="block text-[11px] font-bold text-[#5C5246] mb-2">
+                <div className="border-t border-line-subtle pt-2.5">
+                  <span className="block text-[11px] font-bold text-ink-muted mb-2">
                     Or try a Winter Smog City Preset:
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -267,8 +277,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                           aria-pressed={isSelected}
                           className={`flex items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition border ${
                             isSelected
-                              ? 'bg-[#2D6A4F] text-[#FFFDF8] border-[#2D6A4F]'
-                              : 'bg-[#F6F0E4] text-[#3B3228] border-[#E5DAC8] hover:bg-[#EAE0CE]'
+                              ? 'bg-brand text-on-brand border-brand'
+                              : 'bg-chip text-ink-body border-line hover:bg-chip-hover'
                           }`}
                         >
                           <span className="truncate">{preset.city}</span>
@@ -292,8 +302,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               aria-expanded={showFamilyDrawer}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
                 showFamilyDrawer
-                  ? 'border-[#2D6A4F] bg-[#2D6A4F] text-[#FFFDF8]'
-                  : 'border-[#DDD0BC] bg-[#FFFDF8] text-[#2B241D] hover:bg-[#EFE7D9]'
+                  ? 'border-brand bg-brand text-on-brand'
+                  : 'border-line-strong bg-surface text-ink hover:bg-chip'
               }`}
             >
               <Users className="h-3.5 w-3.5" aria-hidden="true" />
@@ -305,13 +315,13 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               onClick={onToggleTheme}
               aria-pressed={theme === 'dark'}
               aria-label={theme === 'dark' ? 'Switch to Light Beige theme' : 'Switch to Warm Dark theme'}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD0BC] bg-[#FFFDF8] px-3 py-2 text-xs font-semibold text-[#4E4439] hover:bg-[#EFE7D9] active:scale-95 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-chip active:scale-95 transition"
               title={theme === 'dark' ? 'Switch to Light Beige Theme' : 'Switch to Warm Dark Theme'}
             >
               {theme === 'dark' ? (
                 <Sun className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
               ) : (
-                <Moon className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
+                <Moon className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
               )}
               <span className="hidden md:inline">
                 {theme === 'dark' ? 'Light Theme' : 'Dark Theme'}
@@ -328,9 +338,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               aria-expanded={showKeyModal}
               aria-label="Configure optional Gemini API key"
               title="Optional: Connect your own Gemini API key"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DDD0BC] bg-[#FFFDF8] px-3 py-2 text-xs font-semibold text-[#4E4439] hover:bg-[#EFE7D9]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-chip"
             >
-              <KeyRound className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
+              <KeyRound className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
               <span className="hidden lg:inline">
                 {sessionApiKey ? 'Gemini Connected' : 'AI Settings'}
               </span>

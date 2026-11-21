@@ -1,7 +1,7 @@
 /**
  * Open-Meteo Real-Time Air Quality & Weather Telemetry Service
  * Provides geocoding city lookup and live 24-hour atmospheric/pollutant curves
- * with TTL caching, AbortController timeouts, and automatic offline preset fallback.
+ * with TTL caching, AbortController timeouts, in-flight deduplication, and offline fallback.
  */
 
 import type { HourlyPollutantPoint, LocationAirQuality } from '../types';
@@ -19,6 +19,37 @@ export interface GeocodingResult {
   longitude: number;
 }
 
+interface OpenMeteoAirQualityResponse {
+  current?: {
+    pm2_5?: number;
+    pm10?: number;
+    nitrogen_dioxide?: number;
+    ozone?: number;
+    sulphur_dioxide?: number;
+    carbon_monoxide?: number;
+    us_aqi?: number;
+  };
+  hourly?: {
+    time?: string[];
+    pm2_5?: Array<number | null>;
+    pm10?: Array<number | null>;
+    nitrogen_dioxide?: Array<number | null>;
+    us_aqi?: Array<number | null>;
+  };
+}
+
+interface OpenMeteoWeatherResponse {
+  current?: {
+    temperature_2m?: number;
+    relative_humidity_2m?: number;
+    wind_speed_10m?: number;
+  };
+  hourly?: {
+    temperature_2m?: Array<number | null>;
+    wind_speed_10m?: Array<number | null>;
+  };
+}
+
 const geoCache = new TTLCache<GeocodingResult[]>(10 * 60 * 1000, 40);
 const aqiCache = new TTLCache<LocationAirQuality>(5 * 60 * 1000, 30);
 const inFlightAqiRequests = new Map<string, Promise<LocationAirQuality>>();
@@ -28,7 +59,7 @@ const REQUEST_TIMEOUT_MS = 6500;
 
 /**
  * Searches for cities matching a query string via Open-Meteo Geocoding API,
- * blending matching curated presets for instant winter smog testing.
+ * falling back cleanly to curated winter smog presets when offline.
  */
 export async function searchCities(rawQuery: string): Promise<GeocodingResult[]> {
   const query = sanitizeTextInput(rawQuery, 80).toLowerCase();
@@ -41,7 +72,6 @@ export async function searchCities(rawQuery: string): Promise<GeocodingResult[]>
     return cached;
   }
 
-  // Cancel any superseded in-flight geocoding request to conserve bandwidth
   if (activeSearchController) {
     activeSearchController.abort();
   }
@@ -73,10 +103,8 @@ export async function searchCities(rawQuery: string): Promise<GeocodingResult[]>
     geoCache.set(query, results);
     return results;
   } catch {
-    // Offline fallback: match against curated presets
     return WINTER_SMOG_CITY_PRESETS.filter(
-      (p) =>
-        p.city.toLowerCase().includes(query) || p.country.toLowerCase().includes(query)
+      (p) => p.city.toLowerCase().includes(query) || p.country.toLowerCase().includes(query)
     ).map((p, idx) => ({
       id: 9000 + idx,
       name: p.city,
@@ -90,6 +118,137 @@ export async function searchCities(rawQuery: string): Promise<GeocodingResult[]>
       activeSearchController = null;
     }
   }
+}
+
+function buildHourlyForecastPoints(
+  aqData: OpenMeteoAirQualityResponse,
+  weatherData: OpenMeteoWeatherResponse,
+  baseline: { pm25: number; pm10: number; no2: number; tempC: number; windKmh: number }
+): HourlyPollutantPoint[] {
+  const hourlyTimes = aqData.hourly?.time ?? [];
+  if (hourlyTimes.length < 24) {
+    return buildHourlyWinterCurve(
+      baseline.pm25,
+      baseline.pm10,
+      baseline.no2,
+      baseline.tempC,
+      baseline.windKmh
+    );
+  }
+
+  const rawPoints: HourlyPollutantPoint[] = hourlyTimes.slice(0, 24).map((_, idx) => {
+    const hPm25 = Math.max(3, Math.round(aqData.hourly?.pm2_5?.[idx] ?? baseline.pm25));
+    const hPm10 = Math.max(hPm25, Math.round(aqData.hourly?.pm10?.[idx] ?? baseline.pm10));
+    const hNo2 = Math.max(3, Math.round(aqData.hourly?.nitrogen_dioxide?.[idx] ?? baseline.no2));
+    const hTemp = Number((weatherData.hourly?.temperature_2m?.[idx] ?? baseline.tempC).toFixed(1));
+    const hWind = Number((weatherData.hourly?.wind_speed_10m?.[idx] ?? baseline.windKmh).toFixed(1));
+    const hAqi = aqData.hourly?.us_aqi?.[idx] ?? pm25ToUsAqi(hPm25);
+
+    return {
+      hourLabel: `${String(idx).padStart(2, '0')}:00`,
+      hourIndex: idx,
+      pm25: hPm25,
+      pm10: hPm10,
+      no2: hNo2,
+      windSpeedKmh: hWind,
+      tempC: hTemp,
+      usAqi: hAqi,
+      isSafeVentilationWindow: false,
+      isInversionTrap: false,
+    };
+  });
+
+  const daytimeSorted = [...rawPoints]
+    .filter((p) => p.hourIndex >= 11 && p.hourIndex <= 17)
+    .sort((a, b) => a.pm25 - b.pm25);
+  const safeSet = new Set(daytimeSorted.slice(0, 3).map((p) => p.hourIndex));
+  const trapSet = new Set([...rawPoints].sort((a, b) => b.pm25 - a.pm25).slice(0, 5).map((p) => p.hourIndex));
+
+  return rawPoints.map((p) => ({
+    ...p,
+    isSafeVentilationWindow: safeSet.has(p.hourIndex),
+    isInversionTrap: trapSet.has(p.hourIndex),
+  }));
+}
+
+function parseOpenMeteoTelemetry(
+  meta: { city: string; country: string; latitude: number; longitude: number; cacheKey: string },
+  aqData: OpenMeteoAirQualityResponse,
+  weatherData: OpenMeteoWeatherResponse
+): LocationAirQuality {
+  const pm25 = Math.max(2, Math.round(aqData.current?.pm2_5 ?? 55));
+  const pm10 = Math.max(pm25, Math.round(aqData.current?.pm10 ?? pm25 * 1.45));
+  const no2 = Math.max(4, Math.round(aqData.current?.nitrogen_dioxide ?? 38));
+  const o3 = Math.max(4, Math.round(aqData.current?.ozone ?? 28));
+  const so2 = Math.max(2, Math.round(aqData.current?.sulphur_dioxide ?? 12));
+  const co = Math.max(120, Math.round(aqData.current?.carbon_monoxide ?? 640));
+  const usAqi = aqData.current?.us_aqi ?? pm25ToUsAqi(pm25);
+
+  const temperatureC = Number((weatherData.current?.temperature_2m ?? 9.5).toFixed(1));
+  const humidityPct = Math.round(weatherData.current?.relative_humidity_2m ?? 68);
+  const windSpeedKmh = Number((weatherData.current?.wind_speed_10m ?? 6.2).toFixed(1));
+
+  return {
+    id: `live-${meta.cacheKey}`,
+    city: sanitizeTextInput(meta.city, 60),
+    country: sanitizeTextInput(meta.country, 60),
+    latitude: meta.latitude,
+    longitude: meta.longitude,
+    isLiveApi: true,
+    updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    pm25,
+    pm10,
+    no2,
+    o3,
+    so2,
+    co,
+    usAqi,
+    temperatureC,
+    humidityPct,
+    windSpeedKmh,
+    dominantSmogSource:
+      windSpeedKmh < 8
+        ? `Low surface wind (${windSpeedKmh} km/h) and ${temperatureC}°C boundary layer trapping urban transport NOx (${no2} µg/m³) and fine aerosols.`
+        : `Urban particulate load (PM2.5: ${pm25} µg/m³, PM10: ${pm10} µg/m³) moderated by ${windSpeedKmh} km/h surface breeze.`,
+    hourlyForecast: buildHourlyForecastPoints(aqData, weatherData, {
+      pm25,
+      pm10,
+      no2,
+      tempC: temperatureC,
+      windKmh: windSpeedKmh,
+    }),
+  };
+}
+
+function buildOfflineFallbackLocation(
+  city: string,
+  country: string,
+  latitude: number,
+  longitude: number,
+  cacheKey: string
+): LocationAirQuality {
+  return {
+    id: `fallback-${cacheKey}`,
+    city: sanitizeTextInput(city, 60),
+    country: sanitizeTextInput(country, 60),
+    latitude,
+    longitude,
+    isLiveApi: false,
+    updatedAt: 'Simulated Winter Inversion Mode',
+    pm25: 118,
+    pm10: 185,
+    no2: 54,
+    o3: 24,
+    so2: 15,
+    co: 980,
+    usAqi: pm25ToUsAqi(118),
+    temperatureC: 7.5,
+    humidityPct: 72,
+    windSpeedKmh: 4.8,
+    dominantSmogSource:
+      'Winter surface thermal inversion simulation (offline resilience mode active).',
+    hourlyForecast: buildHourlyWinterCurve(118, 185, 54, 7.5, 4.8),
+  };
 }
 
 /**
@@ -119,160 +278,35 @@ export async function fetchLiveAirQualityForCoords(
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-    const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi&hourly=pm10,pm2_5,nitrogen_dioxide,us_aqi&forecast_days=1`;
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,wind_speed_10m&forecast_days=1`;
+      const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi&hourly=pm10,pm2_5,nitrogen_dioxide,us_aqi&forecast_days=1`;
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&hourly=temperature_2m,wind_speed_10m&forecast_days=1`;
 
-    const [aqRes, weatherRes] = await Promise.all([
-      fetch(aqUrl, { signal: controller.signal }),
-      fetch(weatherUrl, { signal: controller.signal }),
-    ]);
+      const [aqRes, weatherRes] = await Promise.all([
+        fetch(aqUrl, { signal: controller.signal }),
+        fetch(weatherUrl, { signal: controller.signal }),
+      ]);
 
-    if (!aqRes.ok || !weatherRes.ok) {
-      throw new Error('Open-Meteo live telemetry unavailable');
+      if (!aqRes.ok || !weatherRes.ok) {
+        throw new Error('Open-Meteo live telemetry unavailable');
+      }
+
+      const [aqData, weatherData] = (await Promise.all([aqRes.json(), weatherRes.json()])) as [
+        OpenMeteoAirQualityResponse,
+        OpenMeteoWeatherResponse,
+      ];
+
+      const result = parseOpenMeteoTelemetry(
+        { city, country, latitude, longitude, cacheKey },
+        aqData,
+        weatherData
+      );
+      aqiCache.set(cacheKey, result);
+      return result;
+    } catch {
+      return buildOfflineFallbackLocation(city, country, latitude, longitude, cacheKey);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const aqData = (await aqRes.json()) as {
-      current?: {
-        pm2_5?: number;
-        pm10?: number;
-        nitrogen_dioxide?: number;
-        ozone?: number;
-        sulphur_dioxide?: number;
-        carbon_monoxide?: number;
-        us_aqi?: number;
-      };
-      hourly?: {
-        time?: string[];
-        pm2_5?: Array<number | null>;
-        pm10?: Array<number | null>;
-        nitrogen_dioxide?: Array<number | null>;
-        us_aqi?: Array<number | null>;
-      };
-    };
-
-    const weatherData = (await weatherRes.json()) as {
-      current?: {
-        temperature_2m?: number;
-        relative_humidity_2m?: number;
-        wind_speed_10m?: number;
-      };
-      hourly?: {
-        temperature_2m?: Array<number | null>;
-        wind_speed_10m?: Array<number | null>;
-      };
-    };
-
-    const pm25 = Math.max(2, Math.round(aqData.current?.pm2_5 ?? 55));
-    const pm10 = Math.max(pm25, Math.round(aqData.current?.pm10 ?? pm25 * 1.45));
-    const no2 = Math.max(4, Math.round(aqData.current?.nitrogen_dioxide ?? 38));
-    const o3 = Math.max(4, Math.round(aqData.current?.ozone ?? 28));
-    const so2 = Math.max(2, Math.round(aqData.current?.sulphur_dioxide ?? 12));
-    const co = Math.max(120, Math.round(aqData.current?.carbon_monoxide ?? 640));
-    const usAqi = aqData.current?.us_aqi ?? pm25ToUsAqi(pm25);
-
-    const temperatureC = Number((weatherData.current?.temperature_2m ?? 9.5).toFixed(1));
-    const humidityPct = Math.round(weatherData.current?.relative_humidity_2m ?? 68);
-    const windSpeedKmh = Number((weatherData.current?.wind_speed_10m ?? 6.2).toFixed(1));
-
-    const hourlyTimes = aqData.hourly?.time ?? [];
-    let hourlyForecast: HourlyPollutantPoint[] = [];
-
-    if (hourlyTimes.length >= 24) {
-      const rawPoints: HourlyPollutantPoint[] = hourlyTimes.slice(0, 24).map((_, idx) => {
-        const hPm25 = Math.max(3, Math.round(aqData.hourly?.pm2_5?.[idx] ?? pm25));
-        const hPm10 = Math.max(hPm25, Math.round(aqData.hourly?.pm10?.[idx] ?? pm10));
-        const hNo2 = Math.max(3, Math.round(aqData.hourly?.nitrogen_dioxide?.[idx] ?? no2));
-        const hTemp = Number((weatherData.hourly?.temperature_2m?.[idx] ?? temperatureC).toFixed(1));
-        const hWind = Number((weatherData.hourly?.wind_speed_10m?.[idx] ?? windSpeedKmh).toFixed(1));
-        const hAqi = aqData.hourly?.us_aqi?.[idx] ?? pm25ToUsAqi(hPm25);
-
-        return {
-          hourLabel: `${String(idx).padStart(2, '0')}:00`,
-          hourIndex: idx,
-          pm25: hPm25,
-          pm10: hPm10,
-          no2: hNo2,
-          windSpeedKmh: hWind,
-          tempC: hTemp,
-          usAqi: hAqi,
-          isSafeVentilationWindow: false,
-          isInversionTrap: false,
-        };
-      });
-
-      // Mark the 3 lowest daytime PM2.5 hours (11:00–17:00) as safe ventilation windows
-      const daytimeSorted = [...rawPoints]
-        .filter((p) => p.hourIndex >= 11 && p.hourIndex <= 17)
-        .sort((a, b) => a.pm25 - b.pm25);
-      const safeSet = new Set(daytimeSorted.slice(0, 3).map((p) => p.hourIndex));
-
-      const trapSorted = [...rawPoints].sort((a, b) => b.pm25 - a.pm25);
-      const trapSet = new Set(trapSorted.slice(0, 5).map((p) => p.hourIndex));
-
-      hourlyForecast = rawPoints.map((p) => ({
-        ...p,
-        isSafeVentilationWindow: safeSet.has(p.hourIndex),
-        isInversionTrap: trapSet.has(p.hourIndex),
-      }));
-    } else {
-      hourlyForecast = buildHourlyWinterCurve(pm25, pm10, no2, temperatureC, windSpeedKmh);
-    }
-
-    const result: LocationAirQuality = {
-      id: `live-${cacheKey}`,
-      city: sanitizeTextInput(city, 60),
-      country: sanitizeTextInput(country, 60),
-      latitude,
-      longitude,
-      isLiveApi: true,
-      updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      pm25,
-      pm10,
-      no2,
-      o3,
-      so2,
-      co,
-      usAqi,
-      temperatureC,
-      humidityPct,
-      windSpeedKmh,
-      dominantSmogSource:
-        windSpeedKmh < 8
-          ? `Low surface wind (${windSpeedKmh} km/h) and ${temperatureC}°C boundary layer trapping urban transport NOx (${no2} µg/m³) and fine aerosols.`
-          : `Urban particulate load (PM2.5: ${pm25} µg/m³, PM10: ${pm10} µg/m³) moderated by ${windSpeedKmh} km/h surface breeze.`,
-      hourlyForecast,
-    };
-
-    aqiCache.set(cacheKey, result);
-    return result;
-  } catch {
-    // Graceful fallback if network is unreachable
-    const fallbackHorario = buildHourlyWinterCurve(118, 185, 54, 7.5, 4.8);
-    return {
-      id: `fallback-${cacheKey}`,
-      city: sanitizeTextInput(city, 60),
-      country: sanitizeTextInput(country, 60),
-      latitude,
-      longitude,
-      isLiveApi: false,
-      updatedAt: 'Simulated Winter Inversion Mode',
-      pm25: 118,
-      pm10: 185,
-      no2: 54,
-      o3: 24,
-      so2: 15,
-      co: 980,
-      usAqi: pm25ToUsAqi(118),
-      temperatureC: 7.5,
-      humidityPct: 72,
-      windSpeedKmh: 4.8,
-      dominantSmogSource:
-        'Winter surface thermal inversion simulation (offline resilience mode active).',
-      hourlyForecast: fallbackHorario,
-    };
-  } finally {
-    clearTimeout(timeoutId);
-  }
   })();
 
   inFlightAqiRequests.set(cacheKey, requestPromise);

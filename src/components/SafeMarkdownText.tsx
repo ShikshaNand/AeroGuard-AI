@@ -20,7 +20,7 @@ function renderInlineSpans(text: string): React.ReactNode[] {
   return tokens.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return (
-        <strong key={i} className="font-bold text-[#231D17]">
+        <strong key={i} className="font-bold text-ink">
           {part.slice(2, -2)}
         </strong>
       );
@@ -29,7 +29,7 @@ function renderInlineSpans(text: string): React.ReactNode[] {
       return (
         <code
           key={i}
-          className="rounded bg-[#EFE7D9] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#1B4D35]"
+          className="rounded bg-chip px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink"
         >
           {part.slice(1, -1)}
         </code>
@@ -46,12 +46,12 @@ function renderSafeLine(line: string, idx: number): React.ReactNode {
   }
 
   if (trimmed === '---') {
-    return <hr key={idx} className="my-2 border-[#DFD2BE]" />;
+    return <hr key={idx} className="my-2 border-line-strong" />;
   }
 
   if (trimmed.startsWith('### ')) {
     return (
-      <h4 key={idx} className="mt-2 text-sm font-extrabold text-[#1B4D35]">
+      <h4 key={idx} className="mt-2 text-sm font-extrabold text-brand-ink">
         {renderInlineSpans(trimmed.slice(4))}
       </h4>
     );
@@ -59,7 +59,7 @@ function renderSafeLine(line: string, idx: number): React.ReactNode {
 
   if (trimmed.startsWith('#### ')) {
     return (
-      <h5 key={idx} className="mt-2 text-xs font-extrabold uppercase tracking-wider text-[#7A4B00]">
+      <h5 key={idx} className="mt-2 text-xs font-extrabold uppercase tracking-wider text-warn-ink">
         {renderInlineSpans(trimmed.slice(5))}
       </h5>
     );
@@ -69,7 +69,7 @@ function renderSafeLine(line: string, idx: number): React.ReactNode {
     return (
       <blockquote
         key={idx}
-        className="beige-sage my-2 rounded-xl border-l-4 border-l-[#2D6A4F] px-3.5 py-2.5 text-xs text-[#1D3B2B]"
+        className="beige-sage my-2 rounded-xl border-l-4 border-l-brand px-3.5 py-2.5 text-xs text-brand-soft"
       >
         {renderInlineSpans(trimmed.slice(2))}
       </blockquote>
@@ -78,8 +78,8 @@ function renderSafeLine(line: string, idx: number): React.ReactNode {
 
   if (trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
     return (
-      <div key={idx} className="ml-2 flex items-start gap-2 text-xs text-[#3B3228] leading-relaxed">
-        <span className="text-[#2D6A4F] font-extrabold" aria-hidden="true">
+      <div key={idx} className="ml-2 flex items-start gap-2 text-xs text-ink-body leading-relaxed">
+        <span className="text-brand-ink font-extrabold" aria-hidden="true">
           •
         </span>
         <span>{renderInlineSpans(trimmed.replace(/^-\s*/, ''))}</span>
@@ -88,7 +88,7 @@ function renderSafeLine(line: string, idx: number): React.ReactNode {
   }
 
   return (
-    <p key={idx} className="text-xs text-[#3B3228] leading-relaxed">
+    <p key={idx} className="text-xs text-ink-body leading-relaxed">
       {renderInlineSpans(trimmed)}
     </p>
   );

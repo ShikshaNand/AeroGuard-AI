@@ -60,7 +60,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = React.memo(
     return (
       <aside className="beige-sidebar w-full lg:w-72 xl:w-80 shrink-0 px-4 py-5 sm:px-6 lg:sticky lg:top-[61px] lg:h-[calc(100vh-61px)] lg:overflow-y-auto space-y-5">
         <nav aria-label="Main guide sections">
-          <span className="hidden lg:block px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#7A6E60]">
+          <span className="hidden lg:block px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-ink-subtle">
             Navigation
           </span>
           <div
@@ -81,21 +81,21 @@ export const SidebarNav: React.FC<SidebarNavProps> = React.memo(
                   tabIndex={isSelected ? 0 : -1}
                   onClick={() => onSelectTab(tab.id)}
                   onKeyDown={(e) => handleTabKeyDown(e, idx)}
-                  className={`hc-card flex flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-all duration-200 ${
+                  className={`flex flex-col gap-0.5 rounded-2xl border px-4 py-3 text-left transition-all duration-200 ${
                     isSelected
-                      ? 'border-[#2D6A4F] bg-[#2D6A4F] text-[#FFFDF8] shadow-sm translate-x-0.5'
-                      : 'border-transparent bg-[#FAF6EE]/80 text-[#2B241D] hover:bg-[#FFFDF9] hover:border-[#DFD2BE]'
+                      ? 'border-brand bg-brand text-on-brand shadow-sm translate-x-0.5'
+                      : 'border-transparent bg-surface-soft/80 text-ink hover:bg-surface hover:border-line-strong'
                   }`}
                 >
                   <span className="flex items-center gap-2.5 text-xs font-extrabold">
-                    <span className={isSelected ? 'text-[#D8F3DC]' : 'text-[#2D6A4F]'}>
+                    <span className={isSelected ? 'text-on-brand/85' : 'text-brand-ink'}>
                       {tab.icon}
                     </span>
                     <span>{tab.label}</span>
                   </span>
                   <span
                     className={`text-[11px] pl-6 leading-snug ${
-                      isSelected ? 'text-[#E3F2E8]' : 'text-[#6A5E50]'
+                      isSelected ? 'text-on-brand/85' : 'text-ink-subtle'
                     }`}
                   >
                     {tab.helper}
@@ -107,16 +107,16 @@ export const SidebarNav: React.FC<SidebarNavProps> = React.memo(
         </nav>
 
         {/* Quick Member Values Adjuster Card (Always 1 click away on Desktop) */}
-        <div className="beige-panel hc-card animate-reveal-up reveal-delay-3 hidden lg:block rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between border-b border-[#ECE2D0] pb-2">
-            <span className="text-xs font-extrabold text-[#231D17] flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-[#2D6A4F]" aria-hidden="true" />
+        <div className="beige-panel animate-reveal-up reveal-delay-3 hidden lg:block rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-line-subtle pb-2">
+            <span className="text-xs font-extrabold text-ink flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-brand-ink" aria-hidden="true" />
               Family Members ({profile.householdSize})
             </span>
             <button
               type="button"
               onClick={onToggleFamilyDrawer}
-              className="text-[11px] font-bold text-[#1B4D35] hover:underline"
+              className="text-[11px] font-bold text-brand-ink hover:underline"
             >
               Home Settings
             </button>
@@ -128,18 +128,18 @@ export const SidebarNav: React.FC<SidebarNavProps> = React.memo(
                 key={row.field}
                 className="flex items-center justify-between text-xs"
               >
-                <span className="text-[#4E4439] font-semibold">{row.label}</span>
+                <span className="text-ink-secondary font-semibold">{row.label}</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => onAdjustMemberCount(row.field, -1)}
                     disabled={profile[row.field] <= 0}
                     aria-label={`Quick decrease ${row.label}`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DFD2BE] bg-[#FAF6EE] text-[#2B241D] hover:bg-[#EAE0CE] active:scale-95 disabled:opacity-35 transition"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-line-strong bg-surface-soft text-ink hover:bg-chip-hover active:scale-95 disabled:opacity-35 transition"
                   >
                     <Minus className="h-3 w-3" aria-hidden="true" />
                   </button>
-                  <span className="w-6 text-center font-extrabold text-[#231D17]">
+                  <span className="w-6 text-center font-extrabold text-ink">
                     {profile[row.field]}
                   </span>
                   <button
@@ -147,7 +147,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = React.memo(
                     onClick={() => onAdjustMemberCount(row.field, 1)}
                     disabled={profile[row.field] >= 10}
                     aria-label={`Quick increase ${row.label}`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#DFD2BE] bg-[#FAF6EE] text-[#2B241D] hover:bg-[#EAE0CE] active:scale-95 disabled:opacity-35 transition"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-line-strong bg-surface-soft text-ink hover:bg-chip-hover active:scale-95 disabled:opacity-35 transition"
                   >
                     <Plus className="h-3 w-3" aria-hidden="true" />
                   </button>

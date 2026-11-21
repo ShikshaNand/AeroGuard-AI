@@ -52,22 +52,22 @@ export class ErrorBoundary extends React.Component<
         <main
           role="alert"
           aria-live="assertive"
-          className="app-shell min-h-screen flex items-center justify-center bg-[#F7F3EA] p-6 text-[#2B241D]"
+          className="app-shell min-h-screen flex items-center justify-center bg-canvas p-6 text-ink"
         >
           <div className="beige-panel max-w-md rounded-3xl p-6 text-center space-y-4">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FDF1EC] border border-[#EBC5B5] text-[#9A3412]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta-soft border border-danger-line text-danger-warm">
               <ShieldAlert className="h-6 w-6" aria-hidden="true" />
             </div>
-            <h1 className="text-lg font-extrabold text-[#231D17]">
+            <h1 className="text-lg font-extrabold text-ink">
               Something went wrong
             </h1>
-            <p className="text-xs text-[#5C5246] leading-relaxed">
+            <p className="text-xs text-ink-muted leading-relaxed">
               AeroGuard AI encountered a display issue ({this.state.errorMessage}). Click below to reset saved view preferences and recover immediately.
             </p>
             <button
               type="button"
               onClick={this.handleResetAndRecover}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2D6A4F] px-5 py-2.5 text-xs font-bold text-[#FFFDF8] hover:bg-[#1B4D35] transition"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-bold text-on-brand hover:bg-brand-hover transition"
             >
               <RotateCcw className="h-4 w-4" aria-hidden="true" />
               <span>Reset &amp; Recover Application</span>

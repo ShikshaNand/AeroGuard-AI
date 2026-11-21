@@ -7,7 +7,24 @@
 const HTML_TAG_REGEX = /<\/?[^>]+(>|$)/g;
 const DANGEROUS_SCHEME_REGEX = /(javascript|data|vbscript)\s*:/gi;
 const EVENT_HANDLER_REGEX = /\bon\w+\s*=/gi;
-const CONTROL_CHARS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/** Strips non-printable ASCII control characters (preserving tabs, LF, and CR). */
+function stripControlCharacters(input: string): string {
+  let result = '';
+  for (let i = 0; i < input.length; i += 1) {
+    const code = input.charCodeAt(i);
+    const isDisallowedControl =
+      (code >= 0 && code <= 8) ||
+      code === 11 ||
+      code === 12 ||
+      (code >= 14 && code <= 31) ||
+      code === 127;
+    if (!isDisallowedControl) {
+      result += input[i];
+    }
+  }
+  return result;
+}
 
 const PROMPT_INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?(previous|prior|system)\s+instructions/i,
@@ -29,7 +46,7 @@ export function sanitizeTextInput(input: string, maxLength = 500): string {
     return '';
   }
 
-  let cleaned = input.replace(CONTROL_CHARS_REGEX, '');
+  let cleaned = stripControlCharacters(input);
   let prev = '';
   while (cleaned !== prev) {
     prev = cleaned;

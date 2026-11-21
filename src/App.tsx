@@ -225,7 +225,7 @@ export function App() {
   );
 
   return (
-    <div className="app-shell min-h-screen flex flex-col bg-[#F7F3EA] text-[#2B241D]">
+    <div className="app-shell min-h-screen flex flex-col bg-canvas text-ink">
       {/* Minimal Single-Row Top Bar */}
       <HeaderBanner
         location={location}
@@ -273,9 +273,9 @@ export function App() {
               {activeTab === 'routines' ? (
                 <AirStatusHero location={location} iaqSim={iaqSim} />
               ) : (
-                <div className="beige-panel hc-card flex flex-wrap items-center justify-between gap-2 rounded-2xl px-5 py-3 text-xs">
+                <div className="beige-panel flex flex-wrap items-center justify-between gap-2 rounded-2xl px-5 py-3 text-xs">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-extrabold text-[#231D17]">
+                    <span className="font-extrabold text-ink">
                       {location.city}, {location.country}
                     </span>
                     <span
@@ -284,10 +284,10 @@ export function App() {
                       AQI {location.usAqi} · {severity.symbolCode}
                     </span>
                   </div>
-                  <span className="text-[#4E4439]">
+                  <span className="text-ink-secondary">
                     Best outdoor window:{' '}
-                    <strong className="text-[#1B4D35]">{ventWindow.bestWindowLabel}</strong> · Indoor air:{' '}
-                    <strong className="text-[#1B4D35]">{iaqSim.optimizedIndoorPm25} µg/m³</strong>
+                    <strong className="text-brand-ink">{ventWindow.bestWindowLabel}</strong> · Indoor air:{' '}
+                    <strong className="text-brand-ink">{iaqSim.optimizedIndoorPm25} µg/m³</strong>
                   </span>
                 </div>
               )}
@@ -352,15 +352,15 @@ export function App() {
           </main>
 
           {/* Full-Width Minimal Clean Footer */}
-          <footer className="mt-auto border-t border-[#E6DCCB] bg-[#FAF6EE] px-4 py-4 sm:px-6 lg:px-10 text-xs text-[#6A5E50]">
+          <footer className="mt-auto border-t border-line bg-surface-soft px-4 py-4 sm:px-6 lg:px-10 text-xs text-ink-subtle">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-1.5">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-[#B45309]" aria-hidden="true" />
+                <ShieldAlert className="h-4 w-4 shrink-0 text-warn-ink" aria-hidden="true" />
                 <span>
                   Based on WHO air guidelines (≤15 µg/m³ PM2.5), ASHRAE room filtration, and Berkeley Earth exposure equivalents. Consult a doctor for breathing emergencies.
                 </span>
               </p>
-              <p className="shrink-0 font-semibold text-[#4E4439]">
+              <p className="shrink-0 font-semibold text-ink-secondary">
                 AeroGuard AI
               </p>
             </div>

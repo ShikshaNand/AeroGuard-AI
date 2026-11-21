@@ -23,7 +23,11 @@ import {
 import type { IndoorAirSimulationResult } from '../domain/iaqCalculator';
 import type { AggregateImpactSummary } from '../domain/impactCalculator';
 import { TTLCache } from '../utils/cache';
-import { SlidingWindowRateLimiter, validatePromptSafety } from '../utils/security';
+import {
+  sanitizeTextInput,
+  SlidingWindowRateLimiter,
+  validatePromptSafety,
+} from '../utils/security';
 
 export interface AssistantContextPayload {
   location: LocationAirQuality;
@@ -192,6 +196,119 @@ function describeFamilyMembers(profile: FamilyProfile): string {
   return parts.length > 0 ? parts.join(', ') : `${profile.householdSize} member(s)`;
 }
 
+function buildProfileFingerprint(
+  profile: FamilyProfile,
+  optimizedIndoorPm25: number
+): string {
+  return [
+    profile.familyName,
+    profile.householdSize,
+    profile.adultsCount,
+    profile.childrenCount,
+    profile.seniorsCount,
+    profile.respiratoryCareCount,
+    profile.petsCount,
+    profile.commuteMode,
+    profile.dailyCommuteKm,
+    profile.heatingType,
+    profile.cookingType,
+    profile.homeSealing,
+    profile.mainRoomAreaSqM,
+    optimizedIndoorPm25,
+  ].join('|');
+}
+
+interface LiveGeminiOutcome {
+  payload?: GenAIResponsePayload;
+  fallbackNotice?: string;
+}
+
+async function resolveLiveGeminiResponse(
+  apiKey: string,
+  prompt: string,
+  adviceContext: ExpertAdviceContext,
+  keyMetricsCited: string[]
+): Promise<LiveGeminiOutcome> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 14_000);
+
+  try {
+    const keySig = apiKey.slice(-6);
+    if (keySig !== cachedKeySignature) {
+      cachedWorkingGeminiModel = null;
+      cachedKeySignature = keySig;
+    }
+
+    const systemInstruction = buildSystemContextPrompt(adviceContext);
+    const candidates = cachedWorkingGeminiModel
+      ? [
+          cachedWorkingGeminiModel,
+          ...DEFAULT_GEMINI_MODELS.filter((m) => m !== cachedWorkingGeminiModel),
+        ]
+      : [...DEFAULT_GEMINI_MODELS];
+
+    let lastStatus = 0;
+    let lastErrorMsg = '';
+    let discovered = false;
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const modelId = candidates[i];
+      const attempt = await invokeGeminiGenerateContent(
+        apiKey,
+        modelId,
+        systemInstruction,
+        prompt,
+        controller.signal
+      );
+
+      if (attempt.ok && attempt.text && attempt.text.length > 15) {
+        cachedWorkingGeminiModel = modelId;
+        return {
+          payload: {
+            content: attempt.text,
+            sourceMode: 'gemini-live',
+            modelUsed: modelId,
+            keyMetricsCited,
+          },
+        };
+      }
+
+      lastStatus = attempt.status;
+      lastErrorMsg = attempt.errorMessage || '';
+
+      if (
+        attempt.status === 401 ||
+        attempt.status === 403 ||
+        (attempt.status === 400 && lastErrorMsg.toLowerCase().includes('api key'))
+      ) {
+        break;
+      }
+
+      if (attempt.status === 404 && !discovered) {
+        discovered = true;
+        const liveModels = await discoverAvailableGeminiModels(apiKey, controller.signal);
+        for (const discoveredModel of liveModels) {
+          if (!candidates.includes(discoveredModel)) {
+            candidates.push(discoveredModel);
+          }
+        }
+      }
+    }
+
+    const safeDetail = lastErrorMsg ? ` (${sanitizeTextInput(lastErrorMsg, 90)})` : '';
+    return {
+      fallbackNotice: `Live Gemini API returned HTTP ${lastStatus || 'error'}${safeDetail} — answered instantly using our built-in science engine.`,
+    };
+  } catch {
+    return {
+      fallbackNotice:
+        'Could not reach live Gemini API (offline or timeout) — answered instantly using our built-in science engine.',
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Generates a tailored, context-grounded response for the user's question.
  * Uses Live Gemini API if an API key is provided, and seamlessly falls back
@@ -234,138 +351,17 @@ export async function generateSmogAssistantAdvice(
     `Indoor Air: ${iaqSim.baselineIndoorPm25} → ${iaqSim.optimizedIndoorPm25} µg/m³`,
   ];
 
-  const envKey =
-    (typeof import.meta !== 'undefined' &&
-      (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-        ?.VITE_GEMINI_API_KEY) ||
-    '';
+  const envKey = import.meta.env?.VITE_GEMINI_API_KEY ?? '';
   const effectiveKey = sessionApiKey?.trim() || envKey.trim();
-
-  // Include all dynamic member counts and home attributes in the cache key
-  const profileFingerprint = [
-    profile.familyName,
-    profile.householdSize,
-    profile.adultsCount,
-    profile.childrenCount,
-    profile.seniorsCount,
-    profile.respiratoryCareCount,
-    profile.petsCount,
-    profile.commuteMode,
-    profile.dailyCommuteKm,
-    profile.heatingType,
-    profile.cookingType,
-    profile.homeSealing,
-    profile.mainRoomAreaSqM,
-    iaqSim.optimizedIndoorPm25,
-  ].join('|');
-
+  const profileFingerprint = buildProfileFingerprint(profile, iaqSim.optimizedIndoorPm25);
   const cacheKey = `${effectiveKey ? 'live' : 'local'}:${location.id}:${location.pm25}:${profileFingerprint}:${prompt.toLowerCase()}`;
+
   const cached = responseCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  let fallbackNotice: string | undefined;
-
-  if (effectiveKey.length >= 16) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 14_000);
-
-    try {
-      const keySig = effectiveKey.slice(-6);
-      if (keySig !== cachedKeySignature) {
-        cachedWorkingGeminiModel = null;
-        cachedKeySignature = keySig;
-      }
-
-      const adviceContext: ExpertAdviceContext = {
-        location,
-        profile,
-        memberSummary,
-        iaqSim,
-        cadrSizing,
-        impactSummary,
-        bestVentWindow: ventWindow.bestWindowLabel,
-        bestVentPm25: ventWindow.bestWindowAvgPm25,
-        worstTrapWindow: ventWindow.worstTrapLabel,
-        worstTrapPm25: ventWindow.worstTrapAvgPm25,
-        whoMultiple,
-        cigsEq,
-      };
-      const systemInstruction = buildSystemContextPrompt(adviceContext);
-
-      // Build ordered candidate list starting with cached verified model if known
-      const candidates = cachedWorkingGeminiModel
-        ? [
-            cachedWorkingGeminiModel,
-            ...DEFAULT_GEMINI_MODELS.filter((m) => m !== cachedWorkingGeminiModel),
-          ]
-        : [...DEFAULT_GEMINI_MODELS];
-
-      let lastStatus = 0;
-      let lastErrorMsg = '';
-      let discovered = false;
-
-      for (let i = 0; i < candidates.length; i += 1) {
-        const modelId = candidates[i];
-        const attempt = await invokeGeminiGenerateContent(
-          effectiveKey,
-          modelId,
-          systemInstruction,
-          prompt,
-          controller.signal
-        );
-
-        if (attempt.ok && attempt.text && attempt.text.length > 15) {
-          cachedWorkingGeminiModel = modelId;
-          const result: GenAIResponsePayload = {
-            content: attempt.text,
-            sourceMode: 'gemini-live',
-            modelUsed: modelId,
-            keyMetricsCited,
-          };
-          responseCache.set(cacheKey, result);
-          return result;
-        }
-
-        lastStatus = attempt.status;
-        lastErrorMsg = attempt.errorMessage || '';
-
-        // If the API key itself is unauthorized (401/403) or bad key (400 API key invalid), stop trying models
-        if (
-          attempt.status === 401 ||
-          attempt.status === 403 ||
-          (attempt.status === 400 && lastErrorMsg.toLowerCase().includes('api key'))
-        ) {
-          break;
-        }
-
-        // On first 404 (model not found for this key/region), dynamically discover enabled models
-        if (attempt.status === 404 && !discovered) {
-          discovered = true;
-          const liveModels = await discoverAvailableGeminiModels(
-            effectiveKey,
-            controller.signal
-          );
-          for (const discoveredModel of liveModels) {
-            if (!candidates.includes(discoveredModel)) {
-              candidates.push(discoveredModel);
-            }
-          }
-        }
-      }
-
-      const detail = lastErrorMsg ? ` (${lastErrorMsg.slice(0, 90)})` : '';
-      fallbackNotice = `Live Gemini API returned HTTP ${lastStatus || 'error'}${detail} — answered instantly using our built-in science engine.`;
-    } catch {
-      fallbackNotice =
-        'Could not reach live Gemini API (offline or timeout) — answered instantly using our built-in science engine.';
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  const expertContent = synthesizeExpertScienceResponse(prompt, {
+  const adviceContext: ExpertAdviceContext = {
     location,
     profile,
     memberSummary,
@@ -378,15 +374,29 @@ export async function generateSmogAssistantAdvice(
     worstTrapPm25: ventWindow.worstTrapAvgPm25,
     whoMultiple,
     cigsEq,
-  });
+  };
+
+  let fallbackNotice: string | undefined;
+  if (effectiveKey.length >= 16) {
+    const liveOutcome = await resolveLiveGeminiResponse(
+      effectiveKey,
+      prompt,
+      adviceContext,
+      keyMetricsCited
+    );
+    if (liveOutcome.payload) {
+      responseCache.set(cacheKey, liveOutcome.payload);
+      return liveOutcome.payload;
+    }
+    fallbackNotice = liveOutcome.fallbackNotice;
+  }
 
   const fallbackResult: GenAIResponsePayload = {
-    content: expertContent,
+    content: synthesizeExpertScienceResponse(prompt, adviceContext),
     sourceMode: 'expert-engine',
     keyMetricsCited,
     fallbackNotice,
   };
-  // Only cache deterministic local answers when no live fallback error occurred
   if (!fallbackNotice) {
     responseCache.set(cacheKey, fallbackResult);
   }

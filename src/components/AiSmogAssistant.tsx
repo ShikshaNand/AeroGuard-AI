@@ -3,11 +3,8 @@ import {
   Bot,
   Send,
   Sparkles,
-  User,
-  ShieldCheck,
   RotateCcw,
   Users,
-  Info,
 } from 'lucide-react';
 import type {
   CADRSizingResult,
@@ -20,7 +17,7 @@ import type { AggregateImpactSummary } from '../domain/impactCalculator';
 import { generateSmogAssistantAdvice } from '../services/genAiService';
 import { calculateWhoMultiple, findOptimalVentilationWindows } from '../domain/airQualityEngine';
 import { loadSavedChatMessages, saveChatMessages } from '../utils/chatStorage';
-import { SafeMarkdownText } from './SafeMarkdownText';
+import { ChatMessageBubble } from './ChatMessageBubble';
 
 interface AiSmogAssistantProps {
   location: LocationAirQuality;
@@ -252,74 +249,7 @@ export const AiSmogAssistant: React.FC<AiSmogAssistantProps> = React.memo(({
         </div>
 
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`animate-chat-enter flex gap-3 ${
-              msg.role === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            {msg.role === 'assistant' && (
-              <div
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand"
-                aria-hidden="true"
-              >
-                <Bot className="h-4 w-4" />
-              </div>
-            )}
-
-            <div
-              className={`max-w-3xl rounded-2xl p-4 shadow-xs ${
-                msg.role === 'user'
-                  ? 'bg-dark-pill text-on-brand font-medium text-xs'
-                  : 'border border-line bg-surface space-y-2'
-              }`}
-            >
-              {msg.role === 'user' ? (
-                <p>{msg.content}</p>
-              ) : (
-                <>
-                  {msg.fallbackNotice && (
-                    <div className="beige-amber rounded-lg px-2.5 py-1.5 text-[11px] text-warn-ink flex items-center gap-1.5">
-                      <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      <span>{msg.fallbackNotice}</span>
-                    </div>
-                  )}
-
-                  {msg.keyMetricsCited && msg.keyMetricsCited.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 border-b border-line-subtle pb-2">
-                      {msg.keyMetricsCited.map((metric, i) => (
-                        <span
-                          key={i}
-                          className="rounded-md bg-chip px-2 py-0.5 text-[10px] font-semibold text-brand-ink border border-line"
-                        >
-                          {metric}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <SafeMarkdownText content={msg.content} />
-                  <div className="flex items-center justify-between border-t border-line-subtle pt-2 text-[10px] text-ink-subtle">
-                    <span className="flex items-center gap-1 font-medium">
-                      <ShieldCheck className="h-3 w-3 text-brand-ink" aria-hidden="true" />
-                      {msg.sourceMode === 'gemini-live'
-                        ? `Google Gemini (${msg.modelUsed ?? 'Live'})`
-                        : 'AeroGuard Environmental Science Engine'}
-                    </span>
-                    <span>{msg.timestamp}</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {msg.role === 'user' && (
-              <div
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-chip text-ink"
-                aria-hidden="true"
-              >
-                <User className="h-4 w-4" />
-              </div>
-            )}
-          </div>
+          <ChatMessageBubble key={msg.id} message={msg} />
         ))}
 
         {isGenerating && (

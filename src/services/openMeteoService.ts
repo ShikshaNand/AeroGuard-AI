@@ -270,6 +270,21 @@ function parseOpenMeteoTelemetry(
   };
 }
 
+function findNearestClimatePreset(latitude: number, longitude: number): LocationAirQuality {
+  let nearest = WINTER_SMOG_CITY_PRESETS[0];
+  let bestDistSq = Number.POSITIVE_INFINITY;
+  for (const preset of WINTER_SMOG_CITY_PRESETS) {
+    const dLat = preset.latitude - latitude;
+    const dLon = preset.longitude - longitude;
+    const distSq = dLat * dLat + dLon * dLon;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      nearest = preset;
+    }
+  }
+  return nearest;
+}
+
 function buildOfflineFallbackLocation(
   city: string,
   country: string,
@@ -277,6 +292,7 @@ function buildOfflineFallbackLocation(
   longitude: number,
   cacheKey: string
 ): LocationAirQuality {
+  const ref = findNearestClimatePreset(latitude, longitude);
   return {
     id: `fallback-${cacheKey}`,
     city: sanitizeTextInput(city, 60),
@@ -284,20 +300,25 @@ function buildOfflineFallbackLocation(
     latitude,
     longitude,
     isLiveApi: false,
-    updatedAt: 'Simulated Winter Inversion Mode',
-    pm25: 118,
-    pm10: 185,
-    no2: 54,
-    o3: 24,
-    so2: 15,
-    co: 980,
-    usAqi: pm25ToUsAqi(118),
-    temperatureC: 7.5,
-    humidityPct: 72,
-    windSpeedKmh: 4.8,
-    dominantSmogSource:
-      'Winter surface thermal inversion simulation (offline resilience mode active).',
-    hourlyForecast: buildHourlyWinterCurve(118, 185, 54, 7.5, 4.8),
+    updatedAt: `Offline Benchmark (Near ${ref.city})`,
+    pm25: ref.pm25,
+    pm10: ref.pm10,
+    no2: ref.no2,
+    o3: ref.o3,
+    so2: ref.so2,
+    co: ref.co,
+    usAqi: ref.usAqi,
+    temperatureC: ref.temperatureC,
+    humidityPct: ref.humidityPct,
+    windSpeedKmh: ref.windSpeedKmh,
+    dominantSmogSource: `Offline winter inversion estimate calibrated to nearby ${ref.city} regional meteorology.`,
+    hourlyForecast: buildHourlyWinterCurve(
+      ref.pm25,
+      ref.pm10,
+      ref.no2,
+      ref.temperatureC,
+      ref.windSpeedKmh
+    ),
   };
 }
 

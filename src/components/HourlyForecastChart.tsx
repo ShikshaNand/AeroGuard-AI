@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Clock, ShieldAlert, Sun } from 'lucide-react';
 import type { LocationAirQuality } from '../types';
 import {
@@ -13,15 +13,35 @@ interface HourlyForecastChartProps {
 
 /**
  * Keyboard-Accessible 24-Hour Winter Thermal Inversion Bar Chart
- * Each hour bar is focusable (`tabIndex={0}`) with descriptive ARIA labels and
- * hover/focus tooltips for screen-reader and keyboard users.
+ * Implements a WAI-ARIA roving tabIndex so Tab crosses the chart in a single stop
+ * while ArrowLeft / ArrowRight / Home / End inspect all 24 individual hours.
  */
 export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = React.memo(
   ({ location, ventAnalysis }) => {
+    const [focusedHour, setFocusedHour] = useState(0);
+    const barRefs = useRef<Array<HTMLDivElement | null>>([]);
+
     const maxHourlyPm25 = useMemo(
       () => Math.max(100, ...location.hourlyForecast.map((h) => h.pm25)),
       [location.hourlyForecast]
     );
+
+    const handleBarKeyDown = (e: React.KeyboardEvent, idx: number) => {
+      const total = location.hourlyForecast.length;
+      if (total === 0) return;
+
+      let nextIdx: number | null = null;
+      if (e.key === 'ArrowRight') nextIdx = (idx + 1) % total;
+      else if (e.key === 'ArrowLeft') nextIdx = (idx - 1 + total) % total;
+      else if (e.key === 'Home') nextIdx = 0;
+      else if (e.key === 'End') nextIdx = total - 1;
+
+      if (nextIdx !== null) {
+        e.preventDefault();
+        setFocusedHour(nextIdx);
+        barRefs.current[nextIdx]?.focus();
+      }
+    };
 
     return (
       <div className="beige-panel rounded-3xl p-5 sm:p-6">
@@ -49,12 +69,13 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = React.mem
         </div>
 
         <div
-          role="img"
-          aria-label={`24-hour PM2.5 forecast chart for ${location.city}. Peak smog occurs around ${ventAnalysis.worstTrapLabel} at ${ventAnalysis.worstTrapAvgPm25} micrograms per cubic meter. Cleanest window is ${ventAnalysis.bestWindowLabel} at ${ventAnalysis.bestWindowAvgPm25} micrograms per cubic meter.`}
+          role="group"
+          aria-roledescription="interactive chart"
+          aria-label={`24-hour PM2.5 forecast chart for ${location.city}. Peak smog occurs around ${ventAnalysis.worstTrapLabel} at ${ventAnalysis.worstTrapAvgPm25} micrograms per cubic meter. Cleanest window is ${ventAnalysis.bestWindowLabel} at ${ventAnalysis.bestWindowAvgPm25} micrograms per cubic meter. Use Left and Right arrow keys to inspect each hour.`}
           className="beige-inset mt-5 rounded-xl p-4"
         >
           <div className="grid grid-cols-12 gap-1.5 sm:grid-cols-24 items-end h-44 pt-4">
-            {location.hourlyForecast.map((point) => {
+            {location.hourlyForecast.map((point, idx) => {
               const heightPct = Math.max(
                 10,
                 Math.min(100, Math.round((point.pm25 / maxHourlyPm25) * 100))
@@ -70,7 +91,12 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = React.mem
               return (
                 <div
                   key={`${location.id}-${point.hourIndex}`}
-                  tabIndex={0}
+                  ref={(el) => {
+                    barRefs.current[idx] = el;
+                  }}
+                  tabIndex={focusedHour === idx ? 0 : -1}
+                  onFocus={() => setFocusedHour(idx)}
+                  onKeyDown={(e) => handleBarKeyDown(e, idx)}
                   aria-label={`${point.hourLabel}: PM2.5 ${point.pm25} micrograms per cubic meter, wind ${point.windSpeedKmh} kilometers per hour${isSafe ? ', best ventilation window' : isTrap ? ', smog peak' : ''}`}
                   className="group relative flex flex-col items-center justify-end h-full rounded-sm focus-visible:outline-2 focus-visible:outline-brand"
                 >

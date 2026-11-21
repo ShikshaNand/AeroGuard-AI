@@ -41,6 +41,10 @@ function getHeader(req: IncomingRequest, name: string): string {
 }
 
 function getClientIp(req: IncomingRequest): string {
+  const vercelForwarded = getHeader(req, 'x-vercel-forwarded-for');
+  if (vercelForwarded) {
+    return vercelForwarded.split(',')[0].trim().slice(0, 64) || 'unknown';
+  }
   const forwarded = getHeader(req, 'x-forwarded-for');
   if (forwarded) {
     return forwarded.split(',')[0].trim().slice(0, 64) || 'unknown';
@@ -63,8 +67,15 @@ function checkRateLimit(ip: string): boolean {
   return limiter.tryAcquire();
 }
 
-/** Rejects cross-origin POST requests so third-party sites cannot drain API quota. */
+/** Rejects cross-origin, cross-site, or missing-client-header POST requests (CSRF & scraper defense). */
 function isSameOriginAllowed(req: IncomingRequest): boolean {
+  if (getHeader(req, 'x-aeroguard-client').trim() !== 'web-v1') {
+    return false;
+  }
+  const fetchSite = getHeader(req, 'sec-fetch-site').trim().toLowerCase();
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+    return false;
+  }
   const origin = getHeader(req, 'origin').trim();
   if (!origin) return true;
   const host = getHeader(req, 'host').trim();

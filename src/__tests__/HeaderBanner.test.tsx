@@ -54,10 +54,14 @@ describe('HeaderBanner city search listbox, Escape handling & API key drawer', (
     fireEvent.change(searchInput, { target: { value: 'Zurich' } });
 
     await waitFor(() => {
-      const option = screen.getByRole('option', { name: /Zurich/i });
-      expect(option).toBeInTheDocument();
-      fireEvent.click(option);
+      expect(screen.getByRole('option', { name: /Zurich/i })).toBeInTheDocument();
     });
+
+    // ArrowDown from search input moves keyboard focus into the first listbox option
+    const option = screen.getByRole('option', { name: /Zurich/i });
+    fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(option);
+    fireEvent.click(option);
 
     await waitFor(() => {
       expect(onSelectLocation).toHaveBeenCalledWith(expect.objectContaining({ city: 'Zurich' }));

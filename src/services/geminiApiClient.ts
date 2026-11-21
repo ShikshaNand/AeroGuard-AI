@@ -80,7 +80,10 @@ async function invokeServerGeminiProxy(
 ): Promise<{ ok: boolean; status: number; text?: string; modelUsed?: string; errorMessage?: string }> {
   const res = await fetch('/api/gemini', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-AeroGuard-Client': 'web-v1',
+    },
     signal,
     body: JSON.stringify({ prompt, context }),
   });

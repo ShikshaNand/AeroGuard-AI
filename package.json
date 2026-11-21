@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint src api",
+    "lint": "eslint src api vite.config.ts",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",

@@ -1,7 +1,7 @@
-/// <reference types="vitest" />
 import { readFileSync } from 'node:fs';
 import { env as nodeEnv } from 'node:process';
-import { defineConfig, type Plugin } from 'vite';
+import { type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
